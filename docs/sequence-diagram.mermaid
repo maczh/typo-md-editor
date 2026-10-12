@@ -1,0 +1,120 @@
+%% typo-md-editor 关键流程时序图（与 system_design.md §6 一致）
+
+sequenceDiagram
+  autonumber
+  participant H as 宿主 App
+  participant M as MdEditor
+  participant S as SettingsStore
+  participant E as EditorStore
+  participant P as EditorPane
+  participant MK as useMilkdown
+  participant CR as Crepe
+  participant PL as plugins×8
+
+  H->>M: mount(props: modelValue/theme/onUpload…)
+  M->>M: ensurePinia()
+  M->>S: load()（localStorage 'typo-md-editor:settings'）
+  S->>S: applyTheme/applyTypography/applyLayout
+  M->>M: setImageUploader(onUpload ?? default)<br/>setImageSrcResolver(resolve ?? identity)
+  M->>E: loadFromText(rewriteImageSrcs(modelValue, resolver))
+  Note over M,P: 子组件 onMounted 晚于父 setup，store 已预载
+  P->>MK: mount(container, doc.content, handleChange)
+  MK->>CR: new Crepe(crepeConfig(root, defaultValue))
+  CR->>PL: use(mermaid/markdownMarker/underline…)
+  MK->>CR: create()
+  CR-->>MK: ready
+  MK->>CR: on(markdownUpdated)
+  P->>P: addEventListener(paste, capture) / contextmenu / pointer 手柄
+  M-->>H: emit('ready', api)
+
+sequenceDiagram
+  autonumber
+  participant U as 用户
+  participant PM as ProseMirror
+  participant CR as Crepe
+  participant P as EditorPane
+  participant E as EditorStore
+  participant M as MdEditor
+  participant H as 宿主
+
+  U->>PM: 输入/删除
+  PM->>CR: markdownUpdated(md)
+  CR->>P: onChange(md)
+  P->>E: updateContent(md) + setOutline(buildOutline(md))
+  E-->>M: watch(doc.content)
+  M->>H: emit('update:modelValue', md)
+  H-->>H: v-model 更新（与 store 相等，不再回灌）
+
+sequenceDiagram
+  autonumber
+  participant U as 用户
+  participant HK as useHotkeys
+  participant A as actions
+  participant SB as useSaveRequest
+  participant M as MdEditor
+  participant H as 宿主
+
+  U->>HK: Ctrl/Cmd+S（keydown, window）
+  HK->>HK: 匹配 COMMAND_DEFS['save']（global:true）
+  HK->>A: run() = requestSave()
+  A->>SB: requestSave()
+  SB->>M: 已注册 handler()
+  M->>H: emit('save')
+  H->>H: 宿主持久化（downloadBlob 或自有后端）
+
+sequenceDiagram
+  autonumber
+  participant U as 用户
+  participant IH as ImageHandler
+  participant IU as images.ts
+  participant CR as Crepe(image-block onUpload)
+  participant E as EditorStore
+  participant M as MdEditor
+
+  alt 粘贴/拖拽图片文件
+    U->>IH: paste/drop (document 监听)
+    IH->>IU: getImageUploader()(file)
+  else 工具栏选择文件
+    U->>A: pickAndInsertImage → input.change
+    A->>IU: getImageUploader()(file)
+  end
+  IU->>IU: 默认：FileReader → data:URL<br/>（宿主 onUpload 可替换为 CDN 上传）
+  IU-->>IH: src
+  IH->>E: insertImage(editor, src, name)
+  E-->>M: markdownUpdated → update:modelValue
+  Note over CR: Crepe image-block 的 onUpload<br/>同样走 getImageUploader()
+
+sequenceDiagram
+  autonumber
+  participant H as 宿主
+  participant M as MdEditor(api)
+  participant EX as exporter
+  participant TH as toHtml
+  participant DL as downloadBlob
+  participant PF as toPdf
+
+  H->>M: api.exportHtml('doc')
+  M->>EX: exportDocument(md,'html','doc')
+  EX->>TH: toHtml(md, 'doc')（katex 预渲染 + unified 管线）
+  TH-->>EX: 完整 HTML 字符串
+  EX->>DL: downloadBlob(blob, 'doc.html')
+  DL->>DL: a[download].click() + revokeObjectURL
+  H->>M: api.print()
+  M->>EX: exportDocument(md,'pdf','doc')
+  EX->>TH: toHtml(...)
+  EX->>PF: toPdf(html)（隐藏 iframe + print.css + iframe.print()）
+
+sequenceDiagram
+  autonumber
+  participant U as 用户
+  participant SD as SettingsDialog
+  participant S as SettingsStore
+  participant TC as themes.ts
+  participant DOM as document
+
+  U->>SD: 选择主题 night → save()
+  SD->>S: update({theme:'night',…}) + applyTheme('night')
+  S->>DOM: documentElement.dataset.theme = 'night'
+  S->>DOM: import('@/styles/themes/night.css')（动态 chunk）
+  S->>S: persist() → localStorage
+  Note over TC: 后续代码块高亮（oneDark）与<br/>Mermaid 暗色由 themeKindMap / data-theme 派生

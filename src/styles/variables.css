@@ -1,0 +1,53 @@
+/* ===========================================================================
+   Theme tokens — every color / size flows through these CSS variables.
+   Switching theme = setting `data-theme` on <html> (see stores/settings.ts)
+   and loading the matching css under styles/themes/.
+   =========================================================================== */
+:root,
+[data-theme='github'],
+[data-theme='newsprint'],
+[data-theme='pixyll'],
+[data-theme='whitey'] {
+  --bg: #ffffff;
+  --fg: #24292f;
+  --fg-muted: #57606a;
+  --accent: #0969da;
+  --accent-soft: #ddf4ff;
+  --border: #d0d7de;
+  --sidebar-bg: #f6f8fa;
+  --panel-bg: #f6f8fa;
+  --code-bg: #f6f8fa;
+  --selection: #b6dcff;
+  --shadow: 0 1px 3px rgba(27, 31, 36, 0.12);
+
+  --font-size: 16px;
+  --line-height: 1.6;
+  --font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --mono-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  --content-max-width: 800px;
+  /* WYSIWYG content column width, as a share of the editor pane. Resizable by
+     dragging the handle on the right edge of the column (see EditorPane.vue). */
+  --content-width: 70%;
+  --sidebar-width: 260px;
+  --panel-width: 240px;
+  --menubar-height: 34px;
+  --statusbar-height: 26px;
+  --radius: 6px;
+}
+
+/* Light themes default to a white editor surface (overridable per theme). */
+[data-theme='github'] .milkdown,
+[data-theme='github'] .editor-pane,
+[data-theme='newsprint'] .milkdown,
+[data-theme='newsprint'] .editor-pane,
+[data-theme='pixyll'] .milkdown,
+[data-theme='pixyll'] .editor-pane,
+[data-theme='whitey'] .milkdown,
+[data-theme='whitey'] .editor-pane {
+  --editor-bg: #ffffff;
+}
+
+/* Dark themes are defined in themes/gothic.css and themes/night.css and override
+   the tokens above. */

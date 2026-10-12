@@ -1,0 +1,46 @@
+/* ===========================================================================
+   Mermaid diagram blocks
+   The `mermaidDiagramPlugin` (src/milkdown/plugins/mermaid.ts) decorates every
+   ```` ```mermaid ```` fenced block: it collapses the fenced *source* while the
+   caret sits elsewhere (class `typo-mermaid-source-hidden`) and renders the
+   diagram *below* it (class `typo-mermaid-diagram`). Clicking the diagram moves
+   the caret back into the source. These styles make that behaviour visible.
+   =========================================================================== */
+
+/* Caret is outside the block → hide the fenced source, keep the diagram. */
+.typo-mermaid-source-hidden {
+  display: none !important;
+}
+
+.typo-mermaid-diagram {
+  position: relative;
+  margin: 8px 0 20px;
+  padding: 18px 16px 14px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: var(--shadow);
+}
+.typo-mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.typo-mermaid-status {
+  color: var(--fg-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.typo-mermaid-status.error {
+  color: #d1242f;
+}
+
+.typo-mermaid-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  opacity: 0.7;
+}

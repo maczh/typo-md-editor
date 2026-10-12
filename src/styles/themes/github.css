@@ -1,0 +1,55 @@
+/* GitHub Light theme — activated by setting `data-theme="github"` on <html>.
+   Most base tokens live in variables.css; this file scopes a few editor-specific
+   tweaks so the prose matches GitHub's reading view. */
+[data-theme='github'] {
+  --editor-bg: #ffffff;
+  --editor-fg: #24292f;
+  --editor-selection: rgba(84, 174, 255, 0.25);
+  --editor-code-bg: #f6f8fa;
+  --editor-quote-border: #d0d7de;
+  --editor-heading-border: #d8dee4;
+}
+
+[data-theme='github'] .milkdown {
+  color: var(--editor-fg);
+  background: var(--editor-bg);
+}
+
+[data-theme='github'] .milkdown pre,
+[data-theme='github'] .milkdown code {
+  background: var(--editor-code-bg);
+}
+
+[data-theme='github'] .milkdown blockquote {
+  border-left: 4px solid var(--editor-quote-border);
+  color: var(--fg-muted);
+}
+
+[data-theme='github'] .milkdown h1,
+[data-theme='github'] .milkdown h2 {
+  border-bottom: 1px solid var(--editor-heading-border);
+  padding-bottom: 0.3em;
+}
+
+/* Re-map Crepe's internal design tokens onto our own theme tokens so its
+   built-in widgets (code block, slash menu, tables, tooltips…) follow the
+   active light/dark theme instead of Crepe's hard-coded palette. */
+[data-theme='github'] .milkdown {
+  --crepe-color-background: var(--bg);
+  --crepe-color-on-background: var(--fg);
+  --crepe-color-surface: var(--code-bg);
+  --crepe-color-surface-low: var(--code-bg);
+  --crepe-color-on-surface: var(--fg);
+  --crepe-color-on-surface-variant: var(--fg-muted);
+  --crepe-color-outline: var(--border);
+  --crepe-color-primary: var(--accent);
+  --crepe-color-secondary: var(--accent-soft);
+  --crepe-color-on-secondary: var(--fg);
+  --crepe-color-inverse: var(--fg);
+  --crepe-color-on-inverse: var(--bg);
+  --crepe-color-inline-code: #ba1a1a;
+  --crepe-color-error: #d1242f;
+  --crepe-color-hover: var(--accent-soft);
+  --crepe-color-selected: var(--accent-soft);
+  --crepe-color-inline-area: var(--border);
+}

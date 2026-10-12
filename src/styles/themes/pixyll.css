@@ -1,0 +1,64 @@
+/* Pixyll theme — clean white surface with a calm blue accent.
+   Activated by setting `data-theme="pixyll"` on <html>. */
+[data-theme='pixyll'] {
+  --bg: #ffffff;
+  --fg: #333333;
+  --fg-muted: #6a6a6a;
+  --accent: #1769aa;
+  --accent-soft: #e6f0f8;
+  --border: #e2e2e2;
+  --sidebar-bg: #f7f9fb;
+  --panel-bg: #f7f9fb;
+  --code-bg: #f4f6f8;
+  --selection: #cfe3f5;
+  --shadow: 0 1px 3px rgba(20, 40, 70, 0.1);
+
+  --editor-bg: #ffffff;
+  --editor-fg: #333333;
+  --editor-selection: rgba(23, 105, 170, 0.22);
+  --editor-code-bg: #f4f6f8;
+  --editor-quote-border: #c9d8e6;
+  --editor-heading-border: #e2e2e2;
+}
+
+[data-theme='pixyll'] .milkdown {
+  color: var(--editor-fg);
+  background: var(--editor-bg);
+}
+
+[data-theme='pixyll'] .milkdown pre,
+[data-theme='pixyll'] .milkdown code {
+  background: var(--editor-code-bg);
+}
+
+[data-theme='pixyll'] .milkdown blockquote {
+  border-left: 4px solid var(--editor-quote-border);
+  color: var(--fg-muted);
+}
+
+[data-theme='pixyll'] .milkdown h1,
+[data-theme='pixyll'] .milkdown h2 {
+  border-bottom: 1px solid var(--editor-heading-border);
+  padding-bottom: 0.3em;
+}
+
+/* Crepe design tokens → Pixyll. */
+[data-theme='pixyll'] .milkdown {
+  --crepe-color-background: var(--bg);
+  --crepe-color-on-background: var(--fg);
+  --crepe-color-surface: var(--code-bg);
+  --crepe-color-surface-low: var(--code-bg);
+  --crepe-color-on-surface: var(--fg);
+  --crepe-color-on-surface-variant: var(--fg-muted);
+  --crepe-color-outline: var(--border);
+  --crepe-color-primary: var(--accent);
+  --crepe-color-secondary: var(--accent-soft);
+  --crepe-color-on-secondary: var(--fg);
+  --crepe-color-inverse: var(--fg);
+  --crepe-color-on-inverse: var(--bg);
+  --crepe-color-inline-code: #1769aa;
+  --crepe-color-error: #c0392b;
+  --crepe-color-hover: var(--accent-soft);
+  --crepe-color-selected: var(--accent-soft);
+  --crepe-color-inline-area: var(--border);
+}

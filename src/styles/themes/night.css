@@ -1,0 +1,69 @@
+/* Night theme — dark, calm slate palette (based on the old Nord Dark).
+   Activated by setting `data-theme="night"` on <html>. */
+[data-theme='night'] {
+  --bg: #2e3440;
+  --fg: #eceff4;
+  --fg-muted: #c2cad6;
+  --accent: #88c0d0;
+  --accent-soft: #3b4252;
+  --border: #434c5e;
+  --sidebar-bg: #272c36;
+  --panel-bg: #272c36;
+  --code-bg: #3b4252;
+  --selection: #4c566a;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+
+  --editor-bg: #2e3440;
+  --editor-fg: #eceff4;
+  --editor-selection: rgba(136, 192, 208, 0.3);
+  --editor-code-bg: #3b4252;
+  --editor-quote-border: #4c566a;
+  --editor-heading-border: #434c5e;
+}
+
+[data-theme='night'] .milkdown {
+  color: var(--editor-fg);
+  background: var(--editor-bg);
+}
+
+[data-theme='night'] .milkdown pre,
+[data-theme='night'] .milkdown code {
+  background: var(--editor-code-bg);
+  color: #e5e9f0;
+}
+
+[data-theme='night'] .milkdown blockquote {
+  border-left: 4px solid var(--editor-quote-border);
+  color: var(--fg-muted);
+}
+
+[data-theme='night'] .milkdown h1,
+[data-theme='night'] .milkdown h2 {
+  border-bottom: 1px solid var(--editor-heading-border);
+  padding-bottom: 0.3em;
+}
+
+[data-theme='night'] ::selection {
+  background: var(--editor-selection);
+}
+
+/* Crepe design tokens → Night (see github.css for the rationale). */
+[data-theme='night'] .milkdown {
+  --crepe-color-background: var(--bg);
+  --crepe-color-on-background: var(--fg);
+  --crepe-color-surface: var(--code-bg);
+  --crepe-color-surface-low: var(--code-bg);
+  --crepe-color-on-surface: var(--fg);
+  --crepe-color-on-surface-variant: var(--fg-muted);
+  --crepe-color-outline: var(--border);
+  --crepe-color-primary: var(--accent);
+  --crepe-color-secondary: var(--accent-soft);
+  --crepe-color-on-secondary: var(--fg);
+  --crepe-color-inverse: var(--fg);
+  --crepe-color-on-inverse: var(--bg);
+  --crepe-color-inline-code: #bf616a;
+  --crepe-color-error: #bf616a;
+  --crepe-color-hover: var(--accent-soft);
+  --crepe-color-selected: var(--accent-soft);
+  --crepe-color-inline-area: var(--border);
+}

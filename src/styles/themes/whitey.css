@@ -1,0 +1,64 @@
+/* Whitey theme — pure-white, minimal surface with a neutral, high-contrast look.
+   Activated by setting `data-theme="whitey"` on <html>. */
+[data-theme='whitey'] {
+  --bg: #ffffff;
+  --fg: #111111;
+  --fg-muted: #767676;
+  --accent: #111111;
+  --accent-soft: #f0f0f0;
+  --border: #e6e6e6;
+  --sidebar-bg: #fafafa;
+  --panel-bg: #fafafa;
+  --code-bg: #f4f4f4;
+  --selection: #d9d9d9;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+
+  --editor-bg: #ffffff;
+  --editor-fg: #111111;
+  --editor-selection: rgba(17, 17, 17, 0.18);
+  --editor-code-bg: #f4f4f4;
+  --editor-quote-border: #cccccc;
+  --editor-heading-border: #e6e6e6;
+}
+
+[data-theme='whitey'] .milkdown {
+  color: var(--editor-fg);
+  background: var(--editor-bg);
+}
+
+[data-theme='whitey'] .milkdown pre,
+[data-theme='whitey'] .milkdown code {
+  background: var(--editor-code-bg);
+}
+
+[data-theme='whitey'] .milkdown blockquote {
+  border-left: 4px solid var(--editor-quote-border);
+  color: var(--fg-muted);
+}
+
+[data-theme='whitey'] .milkdown h1,
+[data-theme='whitey'] .milkdown h2 {
+  border-bottom: 1px solid var(--editor-heading-border);
+  padding-bottom: 0.3em;
+}
+
+/* Crepe design tokens → Whitey. */
+[data-theme='whitey'] .milkdown {
+  --crepe-color-background: var(--bg);
+  --crepe-color-on-background: var(--fg);
+  --crepe-color-surface: var(--code-bg);
+  --crepe-color-surface-low: var(--code-bg);
+  --crepe-color-on-surface: var(--fg);
+  --crepe-color-on-surface-variant: var(--fg-muted);
+  --crepe-color-outline: var(--border);
+  --crepe-color-primary: var(--accent);
+  --crepe-color-secondary: var(--accent-soft);
+  --crepe-color-on-secondary: var(--fg);
+  --crepe-color-inverse: var(--fg);
+  --crepe-color-on-inverse: var(--bg);
+  --crepe-color-inline-code: #d23c3c;
+  --crepe-color-error: #d23c3c;
+  --crepe-color-hover: var(--accent-soft);
+  --crepe-color-selected: var(--accent-soft);
+  --crepe-color-inline-area: var(--border);
+}

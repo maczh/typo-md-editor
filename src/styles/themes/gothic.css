@@ -1,0 +1,83 @@
+/* Gothic theme — dark, near-black background with serif prose and soft grey
+   text. Activated by setting `data-theme="gothic"` on <html>. */
+[data-theme='gothic'] {
+  --bg: #16161a;
+  --fg: #d7d7db;
+  --fg-muted: #9a9aa2;
+  --accent: #c9a36a;
+  --accent-soft: #2a2a30;
+  --border: #2e2e34;
+  --sidebar-bg: #121215;
+  --panel-bg: #121215;
+  --code-bg: #202025;
+  --selection: #3a3a42;
+  --shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+
+  --editor-bg: #16161a;
+  --editor-fg: #d7d7db;
+  --editor-selection: rgba(201, 163, 106, 0.28);
+  --editor-code-bg: #202025;
+  --editor-quote-border: #3a3a42;
+  --editor-heading-border: #2e2e34;
+
+  --font-family: 'Iowan Old Style', 'Palatino Linotype', 'Georgia', 'Songti SC', 'Noto Serif',
+    serif;
+  --mono-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+[data-theme='gothic'] .milkdown {
+  color: var(--editor-fg);
+  background: var(--editor-bg);
+  /* Serif prose for the Gothic reading experience. */
+  font-family: var(--font-family);
+}
+
+[data-theme='gothic'] .milkdown pre,
+[data-theme='gothic'] .milkdown code {
+  background: var(--editor-code-bg);
+  color: #c5c8ce;
+}
+
+[data-theme='gothic'] .milkdown blockquote {
+  border-left: 4px solid var(--editor-quote-border);
+  color: var(--fg-muted);
+  font-style: italic;
+}
+
+[data-theme='gothic'] .milkdown h1,
+[data-theme='gothic'] .milkdown h2,
+[data-theme='gothic'] .milkdown h3 {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+[data-theme='gothic'] .milkdown h1,
+[data-theme='gothic'] .milkdown h2 {
+  border-bottom: 1px solid var(--editor-heading-border);
+  padding-bottom: 0.3em;
+}
+
+[data-theme='gothic'] ::selection {
+  background: var(--editor-selection);
+}
+
+/* Crepe design tokens → Gothic. */
+[data-theme='gothic'] .milkdown {
+  --crepe-color-background: var(--bg);
+  --crepe-color-on-background: var(--fg);
+  --crepe-color-surface: var(--code-bg);
+  --crepe-color-surface-low: var(--code-bg);
+  --crepe-color-on-surface: var(--fg);
+  --crepe-color-on-surface-variant: var(--fg-muted);
+  --crepe-color-outline: var(--border);
+  --crepe-color-primary: var(--accent);
+  --crepe-color-secondary: var(--accent-soft);
+  --crepe-color-on-secondary: var(--fg);
+  --crepe-color-inverse: var(--fg);
+  --crepe-color-on-inverse: var(--bg);
+  --crepe-color-inline-code: #c9a36a;
+  --crepe-color-error: #c97a7a;
+  --crepe-color-hover: var(--accent-soft);
+  --crepe-color-selected: var(--accent-soft);
+  --crepe-color-inline-area: var(--border);
+}

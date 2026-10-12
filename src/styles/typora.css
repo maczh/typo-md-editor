@@ -1,0 +1,83 @@
+/* ===========================================================================
+   Typora-parity refinements layered on top of the Crepe theme.
+   Imported AFTER the Crepe theme so these rules win by source order.
+   =========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   1. Markdown source markers at the caret
+   The `markdownMarkerPlugin` injects this non-editable inline widget at the
+   start of the current heading / blockquote line, e.g. `## ` before a level-2
+   heading. It is decoration-only, so it never affects the Markdown output.
+   --------------------------------------------------------------------------- */
+.milkdown .typo-md-marker {
+  font-family: var(--mono-family);
+  font-weight: 400;
+  color: var(--fg-muted);
+  opacity: 0.55;
+  margin-right: 0.15em;
+  user-select: none;
+  pointer-events: none;
+  font-size: 0.92em;
+  letter-spacing: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   2. Tables — light gray rules, content-based column widths, long-cell wrap.
+   ProseMirror's default stylesheet forces `table-layout: fixed`, which equalises
+   every column and clips long content. Typora lets each column size to its own
+   widest cell and wraps very long content instead of overflowing.
+   --------------------------------------------------------------------------- */
+.milkdown .ProseMirror table,
+.milkdown .milkdown-table-block table {
+  table-layout: auto !important;
+  width: 100%;
+}
+
+.milkdown .ProseMirror table th,
+.milkdown .ProseMirror table td,
+.milkdown .milkdown-table-block th,
+.milkdown .milkdown-table-block td {
+  border: 1px solid var(--border) !important;
+  padding: 6px 12px;
+  /* Let a very long token (URL, hash, ...) wrap instead of stretching the column. */
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* The default stylesheet pins a min-width on cells without an explicit colwidth;
+   keep a small floor so columns can still collapse to their content. */
+.milkdown .ProseMirror table td,
+.milkdown .ProseMirror table th {
+  min-width: 2.5em;
+}
+
+/* A whisper of surface tint on header cells for legibility. */
+.milkdown .milkdown-table-block th {
+  background: color-mix(in srgb, var(--border), transparent 75%);
+}
+
+/* ---------------------------------------------------------------------------
+   3. Code blocks — remove the CodeMirror fold-gutter arrow.
+   Crepe's code block pulls in CodeMirror's `basicSetup`, which enables the fold
+   gutter and paints a black triangle in front of the first (foldable) line.
+   --------------------------------------------------------------------------- */
+.milkdown .milkdown-code-block .cm-foldGutter,
+.milkdown .milkdown-code-block .cm-gutter.cm-foldGutter {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+   4. Code blocks — suppress the active-line / current-line-number indicator
+   when the block is NOT focused. Crepe's code block rides on CodeMirror, whose
+   `highlightActiveLine` / `highlightActiveLineGutter` paint a highlighted line
+   and a highlighted gutter cell. When the caret leaves the block we don't want
+   a stray highlighted line number lingering, so we neutralise both decorations
+   whenever the editor lacks `.cm-focused`. (The caret is also collapsed to the
+   end of a freshly created block in `prose.setCodeBlock`, so line 1 is never
+   auto-selected on creation.)
+   --------------------------------------------------------------------------- */
+.milkdown .milkdown-code-block .cm-editor:not(.cm-focused) .cm-activeLine,
+.milkdown .milkdown-code-block .cm-editor:not(.cm-focused) .cm-activeLineGutter {
+  background-color: transparent !important;
+}

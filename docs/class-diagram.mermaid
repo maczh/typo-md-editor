@@ -1,0 +1,142 @@
+classDiagram
+  class MdEditor {
+    <<component>>
+    +string modelValue
+    +string theme
+    +Lang language
+    +boolean readonly
+    +boolean showToolbar
+    +boolean showContextMenu
+    +boolean hotkeys
+    +number contentWidth
+    +ImageUploader onUpload
+    +getMarkdown() Promise~string~
+    +getHTML() string
+    +loadMarkdown(md) void
+    +insert(md) void
+    +focus() void
+    +destroy() void
+    +setReadonly(v) void
+    +exportMarkdown(name?) void
+    +exportHtml(name?) Promise~void~
+    +print() Promise~void~
+    +openSettings() void
+    +openFind() void
+  }
+  class EditorPane {
+    <<component>>
+    -HTMLElement container
+    +onMounted() void
+    +onContextMenu(e) void
+    +onResizeStart(e) void
+  }
+  class Toolbar { <<component>> +refresh() void }
+  class EditorContextMenu { <<component>> +run(fn) void }
+  class ImageHandler { <<component>> +handleImageFile(file) void }
+  class SourceView { <<component>> +string modelValue }
+  class TableToolbar { <<component>> }
+  class SettingsDialog { <<component>> +boolean modelValue +save() void }
+  class FindDialog { <<component>> +boolean modelValue }
+  class OutlinePanel { <<component>> +scrollTo(node) void }
+  class Icon { <<component>> +IconName name }
+
+  class EditorInstance {
+    <<interface>>
+    +getMarkdown() Promise~string~
+    +getHTML() string
+    +loadMarkdown(md) void
+    +destroy() void
+    +insert(md) void
+    +getEditor() Editor
+    +focus() void
+    +setReadonly(v) void
+  }
+  class UseMilkdown {
+    <<composable>>
+    +EditorInstance instance
+    +mount(container, defaultValue, onChange) void
+    +getMarkdown() Promise~string~
+    +loadMarkdown(md) void
+    +getEditor() Editor
+    +destroy() void
+  }
+  class EditorStore {
+    <<store>>
+    +EditorDoc doc
+    +OutlineNode[] outline
+    +number wordCount
+    +number loadSignal
+    +loadFromText(text, name) void
+    +updateContent(md) void
+    +markSaved() void
+    +setOutline(o) void
+  }
+  class SettingsStore {
+    <<store>>
+    +Settings settings
+    +ThemeDef[] themeList
+    +load() Promise~void~
+    +persist() Promise~void~
+    +applyTheme(id) void
+    +applyTypography() void
+    +applyLayout() void
+    +applyCustomCss(css) void
+    +setLanguage(lang) void
+  }
+  class UIStore { <<composable>> +boolean sourceMode +boolean findOpen +boolean settingsOpen }
+  class EditorMenuStore { <<composable>> +show(x,y,kind,range) void +hide() void }
+  class Actions { <<module>> +toggleBold() void +setHeading(n) void +insertTable() void +pickAndInsertImage() void +requestSave() void +openLink() void }
+  class ProseCommands { <<module>> +setHeading(e,n) bool +toggleBold(e) bool +getSelectionRange(e) Range +replaceImageSrc(e,old,new_) void }
+  class HotkeyRegistry { <<module>> +CommandDef[] COMMAND_DEFS +Record DEFAULT_HOTKEYS +useHotkeys() void +formatHotkey(spec) string }
+  class SaveBus { <<module>> +registerSaveHandler(fn) void +requestSave() void }
+  class Clipboard { <<module>> +writeClipboardText(t) Promise~bool~ +readClipboardText() Promise~string~ }
+  class ImagesUtil { <<module>> +fileToDataUrl(file) Promise~string~ +setImageUploader(fn) void +getImageUploader() ImageUploader +rewriteImageSrcs(md, resolve) string }
+  class Exporter { <<module>> +toHtml(md, title) Promise~string~ +toPdf(html) Promise~void~ +toMarkdown(md) string +exportDocument(md, fmt, base) Promise~void~ +downloadBlob(blob, name) void }
+  class OutlineUtil { <<module>> +buildOutlineFromMarkdown(md) OutlineNode[] }
+  class ThemeCatalog { <<module>> +ThemeDef[] THEMES +isDarkThemeId(id) bool }
+  class Toast { <<module>> +showToast(msg, type) void }
+  class Crepe { <<external>> +create() Promise +destroy() void +getMarkdown() Promise~string~ +setReadonly(v) Crepe }
+
+  class EditorDoc { <<model>> +string name +string content +boolean dirty +number savedAt }
+  class Settings { <<model>> +string theme +Lang language +number fontSize +number lineHeight +string fontFamily +string mode +number contentWidth +string customCss +Record hotkeys }
+  class OutlineNode { <<model>> +string id +number level +string text +number pos +OutlineNode[] children }
+  class HotkeySpec { <<model>> +boolean ctrl +boolean shift +boolean alt +string key +string code }
+  class ThemeDef { <<model>> +string id +string name +ThemeKind kind }
+
+  MdEditor *-- EditorPane : renders
+  MdEditor ..> Toolbar : slot~toolbar~
+  MdEditor ..> SettingsDialog : v-if settingsOpen
+  MdEditor ..> FindDialog : v-if findOpen
+  MdEditor ..> SaveBus : registers handler
+  MdEditor ..> ImagesUtil : injects uploader/resolver
+  MdEditor ..> EditorStore : loadFromText / watch
+  MdEditor ..> SettingsStore : props → apply*
+  EditorPane *-- TableToolbar
+  EditorPane *-- SourceView
+  EditorPane *-- ImageHandler
+  EditorPane *-- EditorContextMenu
+  EditorPane ..> UseMilkdown : mount/destroy
+  EditorPane ..> UIStore : sourceMode
+  EditorPane ..> OutlineUtil : buildOutline
+  EditorContextMenu ..> EditorMenuStore
+  EditorContextMenu ..> Actions
+  Toolbar ..> Actions
+  Toolbar ..> HotkeyRegistry : hk()
+  ImageHandler ..> ImagesUtil
+  ImageHandler ..> UseMilkdown
+  OutlinePanel ..> EditorStore : reads outline
+  SettingsDialog ..> SettingsStore
+  SettingsDialog ..> HotkeyRegistry : REBINDABLE
+  FindDialog ..> UseFind
+  UseMilkdown ..> Crepe : createEditor
+  UseMilkdown ..> EditorInstance : holds
+  EditorStore *-- EditorDoc
+  SettingsStore *-- Settings
+  SettingsStore ..> ThemeCatalog : THEMES
+  Actions ..> ProseCommands
+  Actions ..> UseMilkdown
+  Actions ..> SaveBus : requestSave
+  Actions ..> Toast
+  HotkeyRegistry ..> Actions : defs.run
+  Clipboard ..> Toast
+  Exporter ..> Toast
