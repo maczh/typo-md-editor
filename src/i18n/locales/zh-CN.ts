@@ -207,7 +207,7 @@ export default {
     source: '源码',
   },
   editor: {
-    resizeHint: '拖拽调整编辑区宽度（双击恢复 70%）',
+    resizeHint: '拖拽调整编辑区宽度（双击恢复 80%）',
     codeCopy: '复制',
     codeSearchLanguage: '搜索语言',
     codeNoResult: '无结果',

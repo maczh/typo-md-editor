@@ -207,7 +207,7 @@ export default {
     source: '原始碼',
   },
   editor: {
-    resizeHint: '拖曳調整編輯區寬度（雙擊回復 70%）',
+    resizeHint: '拖曳調整編輯區寬度（雙擊回復 80%）',
     codeCopy: '複製',
     codeSearchLanguage: '搜尋語言',
     codeNoResult: '無結果',

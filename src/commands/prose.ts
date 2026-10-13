@@ -14,7 +14,7 @@ import {
 } from '@milkdown/prose/commands'
 import { wrapInList, sinkListItem, liftListItem } from '@milkdown/prose/schema-list'
 import { undo as pmUndo, redo as pmRedo } from '@milkdown/prose/history'
-import { TextSelection } from '@milkdown/prose/state'
+import { NodeSelection, TextSelection } from '@milkdown/prose/state'
 import { insert } from '@milkdown/utils'
 
 /**
@@ -59,10 +59,34 @@ function markType(schema: EditorState['schema'], ...names: string[]): MarkType |
 /* Block commands                                                      */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Lift the caret's line out of any enclosing list item (Typora-style).
+ *
+ * Markdown cannot nest headings, blockquotes, etc. inside list items, so
+ * block-level conversions on a list line would silently no-op. Block commands
+ * call this first — the line leaves the list and the conversion then applies
+ * to it, which is what Typora does.
+ */
+function liftFromList(view: EditorView): boolean {
+  const { state, dispatch } = view
+  const $from = state.selection.$from
+  let itemType: NodeType | null = null
+  for (let d = $from.depth; d > 0; d -= 1) {
+    const name = $from.node(d).type.name
+    if (name.includes('list_item')) {
+      itemType = $from.node(d).type
+      break
+    }
+  }
+  if (!itemType) return false
+  return liftListItem(itemType)(state, dispatch)
+}
+
 export function setHeading(editor: Editor, level: number): void {
   runWithView(editor, (view) => {
     const h = nodeType(view.state.schema, 'heading')
     if (!h) return
+    liftFromList(view)
     setBlockType(h, { level })(view.state, view.dispatch)
   })
 }
@@ -71,6 +95,7 @@ export function setParagraph(editor: Editor): void {
   runWithView(editor, (view) => {
     const p = nodeType(view.state.schema, 'paragraph')
     if (!p) return
+    liftFromList(view)
     setBlockType(p)(view.state, view.dispatch)
   })
 }
@@ -114,7 +139,9 @@ export function toggleTaskList(editor: Editor): void {
 export function toggleBlockquote(editor: Editor): void {
   runWithView(editor, (view) => {
     const t = nodeType(view.state.schema, 'blockquote')
-    if (t) wrapIn(t)(view.state, view.dispatch)
+    if (!t) return
+    liftFromList(view)
+    wrapIn(t)(view.state, view.dispatch)
   })
 }
 
@@ -539,21 +566,13 @@ export function deleteBlock(editor: Editor): boolean {
   let ok = false
   runWithView(editor, (view) => {
     const { state, dispatch } = view
-    const doc = state.doc
-    const pos = state.selection.from
-    let start = -1
-    let end = -1
-    // `forEach` walks the doc's direct children with their offsets; the first one
-    // containing the selection is the block we want.
-    doc.forEach((node, offset) => {
-      if (start >= 0) return
-      const nodeEnd = offset + node.nodeSize
-      if (pos >= offset && pos <= nodeEnd) {
-        start = offset
-        end = nodeEnd
-      }
-    })
-    if (start < 0) return
+    // Resolve through `blockRangeAt` rather than scanning the doc's children: a
+    // caret that sits exactly on a block boundary used to match the *previous*
+    // block first, deleting the line above the one the user aimed at.
+    const range = blockRangeAt(editor, state.selection.from)
+    if (!range) return
+    const start = range.start
+    const end = range.end
     const tr = state.tr.delete(start, end)
     if (tr.doc.childCount === 0) {
       const p = nodeType(state.schema, 'paragraph')
@@ -563,6 +582,76 @@ export function deleteBlock(editor: Editor): boolean {
     ok = true
   })
   return ok
+}
+
+/**
+ * Delete the **line** containing `pos` (the caret when `pos` is omitted).
+ *
+ * Unlike {@link deleteBlock} this is what the per-line "::" handle uses: inside
+ * a list only the list item under the caret goes away, and containers left
+ * empty by the delete (a `bullet_list` with no items is invalid content and
+ * renders as a stray marker) are pruned as well.
+ */
+export function deleteLineAt(editor: Editor, pos?: number): boolean {
+  let ok = false
+  runWithView(editor, (view) => {
+    const range = lineRangeAt(editor, pos ?? view.state.selection.from)
+    if (!range) return
+    const { state } = view
+    let tr = state.tr.delete(range.start, range.end)
+    let cursor = range.start
+    // Prune ancestors that the delete emptied out, innermost first.
+    //
+    // Removing the last item of a list cannot actually leave it childless:
+    // `bullet_list` content is `list_item+`, so ProseMirror's replace step fills
+    // the hole with a fresh empty item. Such a list is empty for all practical
+    // purposes (and renders as a lone dangling marker), so it is pruned too.
+    for (;;) {
+      const $p = tr.doc.resolve(Math.max(0, Math.min(cursor, tr.doc.content.size)))
+      let pruned = false
+      for (let d = $p.depth; d >= 1; d -= 1) {
+        const node = $p.node(d)
+        if (!/list|blockquote/.test(node.type.name)) break
+        const empty =
+          node.childCount === 0 ||
+          (node.childCount === 1 && node.child(0).textContent.trim() === '')
+        if (!empty) break
+        const from = $p.before(d)
+        tr = tr.delete(from, from + node.nodeSize)
+        cursor = from
+        pruned = true
+        break
+      }
+      if (!pruned) break
+    }
+    if (tr.doc.childCount === 0) {
+      const p = nodeType(state.schema, 'paragraph')
+      if (p) tr.insert(0, p.create())
+    }
+    view.dispatch(tr.scrollIntoView())
+    ok = true
+  })
+  return ok
+}
+
+/**
+ * The position just inside the block Crepe's block service has selected with a
+ * `NodeSelection` — i.e. the block its handle is currently anchored to — or null
+ * when the selection is a caret/range instead.
+ *
+ * Crepe dispatches that `NodeSelection` from its own `mousedown` on the handle,
+ * so it is the most reliable fallback for "which block was the handle on" when
+ * our own coordinate probe came up empty (the mousedown triggers a reflow that
+ * makes a fresh `posAtCoords` land on a different line).
+ */
+export function nodeSelectionPos(editor: Editor | null): number | null {
+  if (!editor) return null
+  let pos: number | null = null
+  runWithView(editor, (view) => {
+    const sel = view.state.selection
+    if (sel instanceof NodeSelection) pos = sel.from + 1
+  })
+  return pos
 }
 
 /**
@@ -727,6 +816,145 @@ export function posAtCoords(
     if (res) pos = res.pos
   })
   return pos
+}
+
+/**
+ * Viewport rect of the ProseMirror content box — the anchor for floaters that
+ * must land *inside* the editable (block-handle menus probe here instead of
+ * relative to the handle, which floating-ui may have moved or clipped).
+ */
+export function viewDomRect(editor: Editor | null): DOMRect | null {
+  if (!editor) return null
+  let rect: DOMRect | null = null
+  runWithView(editor, (view) => {
+    rect = view.dom.getBoundingClientRect()
+  })
+  return rect
+}
+
+/** A top-level block, in document positions. */
+export interface BlockRange {
+  /** Content range — inside the node's open/close tokens. */
+  from: number
+  to: number
+  /** Node range — including its open/close tokens. */
+  start: number
+  end: number
+}
+
+/** Resolved (non-boundary) `$pos` for `raw`, or null when that is impossible. */
+function resolveInsideDoc(
+  doc: PMNode,
+  raw: number,
+): ReturnType<PMNode['resolve']> | null {
+  const max = doc.content.size
+  let $pos = doc.resolve(Math.max(0, Math.min(raw, max)))
+  if ($pos.depth === 0) $pos = doc.resolve(Math.min(max, Math.max(0, Math.min(raw, max)) + 1))
+  return $pos.depth < 1 ? null : $pos
+}
+
+/** Node range (open/close tokens included) for the node at `depth` above `$pos`. */
+function nodeRangeAt(
+  $pos: ReturnType<PMNode['resolve']>,
+  depth: number,
+): BlockRange {
+  const start = $pos.before(depth)
+  const node = $pos.node(depth)
+  return {
+    from: start + 1,
+    to: start + 1 + node.content.size,
+    start,
+    end: start + node.nodeSize,
+  }
+}
+
+/**
+ * The top-level block containing `pos` (the caret when `pos` is omitted).
+ *
+ * A position sitting exactly *between* two blocks resolves at depth 0; it is
+ * nudged forward so callers always get a real block. That boundary case is what
+ * made block actions ("cut", "copy", "delete") hit the block *above* the one the
+ * user aimed at: a `pos >= start && pos <= end` scan matches the previous block
+ * first, because it is visited earlier.
+ */
+export function blockRangeAt(editor: Editor | null, pos?: number): BlockRange | null {
+  if (!editor) return null
+  let out: BlockRange | null = null
+  runWithView(editor, (view) => {
+    const doc = view.state.doc
+    const $pos = resolveInsideDoc(doc, pos ?? view.state.selection.from)
+    if (!$pos) return
+    out = nodeRangeAt($pos, 1)
+  })
+  return out
+}
+
+/** Node types that hold a single *line* inside a list. */
+const LIST_ITEM_NAMES = ['list_item', 'task_list_item']
+
+/**
+ * The **line** containing `pos` (the caret when `pos` is omitted) — the range
+ * the block handle's cut / copy / delete act on.
+ *
+ * The handle is per-line, so a line inside a list is the *list item*, not the
+ * whole list: deleting one item of a three-item bullet list must remove that
+ * item and leave the other two alone. Outside a list the line is simply the
+ * top-level block ({@link blockRangeAt}).
+ */
+export function lineRangeAt(editor: Editor | null, pos?: number): BlockRange | null {
+  if (!editor) return null
+  let out: BlockRange | null = null
+  runWithView(editor, (view) => {
+    const doc = view.state.doc
+    const raw = pos ?? view.state.selection.from
+    const $pos = resolveInsideDoc(doc, raw)
+    if (!$pos) return
+    // Innermost list item wins: on nested lists the handle targets the item the
+    // caret is on, not the outer one.
+    for (let d = $pos.depth; d >= 1; d -= 1) {
+      if (LIST_ITEM_NAMES.includes($pos.node(d).type.name)) {
+        out = nodeRangeAt($pos, d)
+        return
+      }
+    }
+    out = nodeRangeAt($pos, 1)
+  })
+  return out
+}
+
+/** Plain text between two document positions (block separators become `\n`). */
+export function getRangeText(editor: Editor | null, from: number, to: number): string {
+  if (!editor) return ''
+  let text = ''
+  runWithView(editor, (view) => {
+    const max = view.state.doc.content.size
+    const a = Math.max(0, Math.min(from, max))
+    const b = Math.max(0, Math.min(to, max))
+    text = view.state.doc.textBetween(a, b, '\n', '\n')
+  })
+  return text
+}
+
+/**
+ * Insert an empty paragraph right after the top-level block containing `pos`
+ * and leave the caret in it — the "先新建空行" half of the "+" handle's job.
+ * Returns the new caret position, or null when it could not be inserted.
+ */
+export function insertBlockAfter(editor: Editor | null, pos: number): number | null {
+  if (!editor) return null
+  let caret: number | null = null
+  runWithView(editor, (view) => {
+    const range = blockRangeAt(editor, pos)
+    if (!range) return
+    const p = nodeType(view.state.schema, 'paragraph')
+    if (!p) return
+    const at = Math.min(range.end, view.state.doc.content.size)
+    const tr = view.state.tr.insert(at, p.create())
+    const sel = TextSelection.near(tr.doc.resolve(at))
+    view.dispatch(tr.setSelection(sel).scrollIntoView())
+    caret = sel.from
+  })
+  return caret
 }
 
 /** Place the caret at `pos` so subsequent commands apply to that block. */

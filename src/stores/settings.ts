@@ -101,7 +101,7 @@ export const useSettingsStore = defineStore('typo-settings', () => {
   /** Push the WYSIWYG column width into its CSS variable. */
   function applyLayout(): void {
     const width = Number(settings.contentWidth)
-    const safe = Number.isFinite(width) ? Math.min(100, Math.max(30, width)) : 70
+    const safe = Number.isFinite(width) ? Math.min(100, Math.max(30, width)) : 80
     settings.contentWidth = safe
     document.documentElement.style.setProperty('--content-width', `${safe}%`)
   }

@@ -7,14 +7,18 @@ import { hk } from '@/composables/useHotkeys'
 import Icon from '@/components/common/Icon.vue'
 
 /**
- * Typora-style floating menu, shared by two entry points:
- *  - clicking the per-line block handle (opens on the block style submenu), and
- *  - right-clicking inside the editor (context-sensitive: table vs. paragraph).
+ * Typora-style floating menu, shared by three entry points:
+ *  - the "+" block handle (opens on the INSERT submenu),
+ *  - the "::" block handle (opens collapsed — submenus expand on hover), and
+ *  - right-clicking inside the editor (context-sensitive: table vs. paragraph,
+ *    also collapsed).
  */
 
 const { t } = useI18n()
 const menu = useEditorMenu()
 const openSub = ref<string | null>(null)
+// Mirror the menu's requested initial submenu so the watch below can open it.
+const sub = menu.sub
 
 const isTable = computed(() => menu.kind.value === 'table')
 const submenuTitle = computed(() => (isTable.value ? t('ctx.blockStyleTable') : t('ctx.blockStyle')))
@@ -40,8 +44,13 @@ const style = computed(() => {
  */
 function run(fn?: () => void | Promise<void>): void {
   const r = menu.range.value
+  // The "+" handle leaves a hook that creates the new empty line — it has to run
+  // *instead of* restoring the captured range, because creating the line
+  // invalidates that range and the caret must end up inside the new line.
+  const before = menu.beforeRun.value
   menu.hide()
-  if (r) A.restoreSelection(r.from, r.to)
+  if (before) before()
+  else if (r) A.restoreSelection(r.from, r.to)
   else A.focusEditor()
   if (fn) void fn()
 }
@@ -120,20 +129,47 @@ const tableItems = computed<Item[]>(() => [
 watch(
   () => menu.open.value,
   (o) => {
-    if (o) openSub.value = null
+    // Pre-expand the submenu the opener asked for (the "+" handle requests
+    // 'insert'); right-click leaves it collapsed (sub === null).
+    if (o) openSub.value = sub.value
   },
 )
 
 function onKey(e: KeyboardEvent): void {
   if (e.key === 'Escape') menu.hide()
 }
-onMounted(() => window.addEventListener('keydown', onKey))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+
+/**
+ * Dismiss the menu on any press outside it.
+ *
+ * The full-screen `.ctx-layer` used to swallow that press itself, but that made
+ * the layer the `pointerdown` *target*: the block handle underneath never saw
+ * the press, so the matching `pointerup` fell through to Crepe's own "+"
+ * handler, which inserted an empty paragraph and opened Crepe's slash menu. The
+ * layer is now transparent to hit-testing (`pointer-events: none`) and dismissal
+ * moved here — we only hide, never stop the event, so a press on a block handle
+ * still reaches the handle logic.
+ */
+function onOutsidePointerDown(e: PointerEvent): void {
+  if (!menu.open.value) return
+  const target = e.target as HTMLElement | null
+  if (target?.closest?.('.ctx-menu')) return
+  menu.hide()
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKey)
+  document.addEventListener('pointerdown', onOutsidePointerDown, true)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey)
+  document.removeEventListener('pointerdown', onOutsidePointerDown, true)
+})
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="menu.open.value" class="ctx-layer" @pointerdown="menu.hide()" @contextmenu.prevent>
+    <div v-if="menu.open.value" class="ctx-layer" @contextmenu.prevent>
       <!-- `.prevent` on both pointerdown and mousedown keeps the editor from
            losing focus/selection while the menu is being clicked. -->
       <div
@@ -302,13 +338,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </template>
 
 <style scoped>
+/* Transparent to hit-testing: a press outside the menu has to reach whatever is
+   underneath (the editor, or the block handle) instead of being swallowed here —
+   see `onOutsidePointerDown`. */
 .ctx-layer {
   position: fixed;
   inset: 0;
   z-index: 1500;
+  pointer-events: none;
 }
 .ctx-menu {
   position: fixed;
+  pointer-events: auto;
   min-width: 236px;
   padding: 6px;
   background: var(--bg);

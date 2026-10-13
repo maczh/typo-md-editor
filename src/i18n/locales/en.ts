@@ -207,7 +207,7 @@ export default {
     source: 'Source',
   },
   editor: {
-    resizeHint: 'Drag to resize the editor column (double-click to reset to 70%)',
+    resizeHint: 'Drag to resize the editor column (double-click to reset to 80%)',
     codeCopy: 'Copy',
     codeSearchLanguage: 'Search language',
     codeNoResult: 'No result',

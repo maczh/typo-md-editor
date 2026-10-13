@@ -16,6 +16,7 @@ const entries = [
   'tests/exporter-toMarkdown.test.ts',
   'tests/outline.test.ts',
   'tests/i18n.test.ts',
+  'tests/prose-line.test.ts',
 ]
 
 const aliasPlugin = {

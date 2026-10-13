@@ -78,28 +78,48 @@ export function redo(): void {
   withEditor((e) => prose.redo(e))
 }
 
+/**
+ * Cut the selection — or, when the caret is bare (the block-handle entry point),
+ * the **line** it sits on. Typora's block menu behaves the same way: with no
+ * selection the current line is the implicit target, so the menu buttons always
+ * act on the line the user opened them for instead of doing nothing (or, worse,
+ * on whatever selection was left over from earlier).
+ *
+ * "Line" is deliberately narrower than "block": on a list item only that item
+ * goes, not the whole list.
+ */
 export function cut(): void {
   const editor = useMilkdown().getEditor()
-  const range = prose.getSelectionRange(editor)
-  if (!range || range.empty) {
+  const sel = prose.getSelectionRange(editor)
+  const wholeLine = !sel || sel.empty
+  const range = wholeLine ? prose.lineRangeAt(editor) : sel
+  if (!range) {
     showToast('请先选中要剪切的内容', 'info')
     return
   }
-  const text = prose.getSelectionText(editor)
+  const text = prose.getRangeText(editor, range.from, range.to)
   void writeClipboardText(text).then((ok) => {
     if (!ok) {
       showToast('剪切失败：无法写入系统剪贴板', 'error')
       return
     }
     withEditor((e) => {
+      if (wholeLine) {
+        prose.deleteLineAt(e, range.from)
+        return
+      }
       prose.setSelectionRange(e, range.from, range.to)
       prose.deleteSelection(e)
     })
   })
 }
 
+/** Copy the selection, or the caret's line when there is no selection. */
 export function copySelection(): void {
-  const text = prose.getSelectionText(useMilkdown().getEditor())
+  const editor = useMilkdown().getEditor()
+  const sel = prose.getSelectionRange(editor)
+  const range = !sel || sel.empty ? prose.lineRangeAt(editor) : sel
+  const text = range ? prose.getRangeText(editor, range.from, range.to) : ''
   if (!text) {
     showToast('请先选中要复制的内容', 'info')
     return
@@ -162,8 +182,8 @@ export function focusEditor(): void {
 
 /**
  * The 🗑 button. With a selection it removes just that text; on a bare caret
- * (the block-handle entry point) it removes the whole block, which is what
- * Typora's block menu does.
+ * (the block-handle entry point) it removes the current *line* — one list item,
+ * not the whole list — which is what Typora's block menu does.
  */
 export function deleteSelection(): void {
   withEditor((e) => {
@@ -172,7 +192,7 @@ export function deleteSelection(): void {
       prose.deleteSelection(e)
       return
     }
-    if (!prose.deleteBlock(e)) showToast('当前位置没有可删除的内容块', 'info')
+    if (!prose.deleteLineAt(e)) showToast('当前位置没有可删除的内容块', 'info')
   })
 }
 

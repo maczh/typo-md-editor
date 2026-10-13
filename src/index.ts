@@ -23,6 +23,12 @@ export * as editorActions from './commands/actions'
 // ── 主题 / 安装插件 / i18n ────────────────────────────────────────
 export { THEMES, isDarkThemeId } from './themes'
 export { typoPlugin, ensurePinia } from './install'
+
+// ── 宿主挂载桥梁（React / 原生 DOM 集成用）────────────────────────────
+// 必须与库内打包的同一份 Vue 实例一起导出，否则宿主另引一份 vue 会出现
+// 「两个 Vue 副本」导致 app 无法挂载。typo-md-editor 是 lib 构建（不 externalize vue），
+// 这里 re-export 的 createApp 即库内那份。
+export { createApp, h, type App, type Component } from 'vue'
 export { i18n as typoI18n, SUPPORTED_LANGS } from './i18n'
 
 // ── 导出工具 ──────────────────────────────────────────────────────

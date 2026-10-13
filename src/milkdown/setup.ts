@@ -3,6 +3,7 @@ import type { Editor } from '@milkdown/core'
 import { editorViewCtx } from '@milkdown/core'
 import type { EditorView } from '@milkdown/prose/view'
 import { insert, getHTML as getHTMLCommand } from '@milkdown/utils'
+import { shift } from '@floating-ui/dom'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { i18n } from '@/i18n'
 import { isDarkThemeId } from '@/themes'
@@ -59,6 +60,17 @@ function crepeConfig(root: HTMLElement, defaultValue: string, options: CreateOpt
     root,
     defaultValue,
     featureConfigs: {
+      'block-edit': {
+        blockHandle: {
+          // 悬停手柄是 absolute 定位、挂在 overflow:auto 的滚动容器里。当内容列
+          // 几乎占满容器（左侧留白放不下 ~58px 的手柄胶囊）时，胶囊会被滚动容器
+          // 裁掉一半——表现为"+"或"::"其中一个"消失"。
+          // 注意：placement 为 left 时 floating-ui 的 shift 默认只钳制纵轴
+          // （crossAxis 才是水平轴，默认 false），必须显式打开，否则水平裁剪
+          // 依旧。shift() 把胶囊推回可视区（最坏情况轻微压住文本左缘）。
+          middleware: [shift({ padding: 6, crossAxis: true })],
+        },
+      },
       'code-mirror': {
         theme: isDarkTheme() ? oneDark : [],
         copyText: t('editor.codeCopy'),
@@ -92,6 +104,7 @@ export async function createEditor(
 ): Promise<EditorInstance> {
   let crepe: Crepe | null = null
   let loading = false
+  let loadSequence = 0
 
   const attach = (instance: Crepe) => {
     instance.on((api) => {
@@ -169,15 +182,32 @@ export async function createEditor(
     editor.action(insert(markdown))
   }
   const loadMarkdown = (markdown: string) => {
-    if (!crepe) return
-    void (crepe as unknown as { destroy: () => void }).destroy()
-    crepe = spawn(markdown)
-    loading = true
-    void (crepe as unknown as { create: () => Promise<void> })
-      .create()
-      .then(() => {
-        loading = false
-      })
+    // 重建必须**串行**：`Editor.destroy()` 是异步的（返回 Promise），旧实例的
+    // DOM/插件视图清理（包括块手柄的挂载与事件绑定）在 Promise 里才完成。
+    // 以前 `void destroy()` 之后立刻 spawn，新旧实例会短暂共存并争抢同一个
+    // root 容器——导入文档后手柄丢失/错位/点击无响应都是这个竞态的表现。
+    // 序号守卫让连续多次 loadMarkdown 时只有最后一次真正落地。
+    const seq = ++loadSequence
+    void (async () => {
+      const previous = crepe
+      crepe = null
+      if (previous) {
+        try {
+          await (previous as unknown as { destroy: () => Promise<unknown> }).destroy()
+        } catch {
+          /* already destroying */
+        }
+      }
+      if (seq !== loadSequence) return // superseded by a newer loadMarkdown
+      const instance = spawn(markdown)
+      crepe = instance
+      loading = true
+      try {
+        await (instance as unknown as { create: () => Promise<void> }).create()
+      } finally {
+        if (seq === loadSequence) loading = false
+      }
+    })()
   }
   const destroy = () => {
     ;(crepe as unknown as { destroy: () => void } | null)?.destroy()
