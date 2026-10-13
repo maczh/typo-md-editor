@@ -1,5 +1,5 @@
-import { ref } from 'vue'
 import type { BlockKind } from '@/commands/prose'
+import { makeReactive, refLike, useStoreSubscription } from '@/composables/useStoreSafe'
 
 /**
  * Shared state for the editor's floating menu. A single module-level singleton so
@@ -17,57 +17,75 @@ export interface MenuRange {
   to: number
 }
 
-const open = ref(false)
-const x = ref(0)
-const y = ref(0)
-const kind = ref<MenuKind>('paragraph')
-const range = ref<MenuRange | null>(null)
-/**
- * When the menu is opened from a block handle we may want a submenu expanded
- * right away (e.g. the "+" handle opens the insert submenu). `null` means "no
- * submenu pre-expanded" — used by the right-click context menu.
- */
-const sub = ref<string | null>(null)
-/**
- * A hook the opener may leave behind, run *instead of* restoring the captured
- * range when an item is picked. The "+" handle uses it to create the new empty
- * line at that point — the line must not exist until the user actually picks
- * something, but the action then needs it to exist already.
- */
-const beforeRun = ref<(() => void) | null>(null)
-
 /** Submenu ids recognised by `EditorContextMenu`. */
 export type MenuSub = 'insert' | 'style' | 'table' | null
 
-export function useEditorMenu() {
-  return {
-    open,
-    x,
-    y,
-    kind,
-    range,
-    sub,
-    beforeRun,
-    show(
-      px: number,
-      py: number,
-      k: MenuKind = 'paragraph',
-      r: MenuRange | null = null,
-      s: MenuSub = null,
-      before?: (() => void) | null,
-    ): void {
-      x.value = px
-      y.value = py
-      kind.value = k
-      range.value = r
-      sub.value = s
-      beforeRun.value = before ?? null
-      open.value = true
-    },
-    hide(): void {
-      open.value = false
-      sub.value = null
-      beforeRun.value = null
-    },
-  }
+interface MenuState {
+  open: boolean
+  x: number
+  y: number
+  kind: MenuKind
+  range: MenuRange | null
+  sub: MenuSub
+  beforeRun: (() => void) | null
+}
+
+const menuObs = makeReactive<MenuState>({
+  open: false,
+  x: 0,
+  y: 0,
+  kind: 'paragraph',
+  range: null,
+  sub: null,
+  beforeRun: null,
+})
+
+export interface EditorMenuApi {
+  open: { value: boolean }
+  x: { value: number }
+  y: { value: number }
+  kind: { value: MenuKind }
+  range: { value: MenuRange | null }
+  sub: { value: MenuSub }
+  beforeRun: { value: (() => void) | null }
+  show: (
+    px: number,
+    py: number,
+    k?: MenuKind,
+    r?: MenuRange | null,
+    s?: MenuSub,
+    before?: (() => void) | null,
+  ) => void
+  hide: () => void
+}
+
+export const menuApi: EditorMenuApi = {
+  open: refLike(menuObs, 'open'),
+  x: refLike(menuObs, 'x'),
+  y: refLike(menuObs, 'y'),
+  kind: refLike(menuObs, 'kind'),
+  range: refLike(menuObs, 'range'),
+  sub: refLike(menuObs, 'sub'),
+  beforeRun: refLike(menuObs, 'beforeRun'),
+
+  show(px, py, k = 'paragraph', r = null, s = null, before = null) {
+    menuObs.set({
+      x: px,
+      y: py,
+      kind: k,
+      range: r,
+      sub: s,
+      beforeRun: before ?? null,
+      open: true,
+    })
+  },
+
+  hide() {
+    menuObs.set({ open: false, sub: null, beforeRun: null })
+  },
+}
+
+export function useEditorMenu(): EditorMenuApi {
+  useStoreSubscription(menuObs)
+  return menuApi
 }

@@ -1,13 +1,22 @@
-import { ref } from 'vue'
+import { makeReactive, refLike, useStoreSubscription } from '@/composables/useStoreSafe'
 import { useMilkdown } from '@/composables/useMilkdown'
 import { useEditorStore } from '@/stores/editor'
 import { buildOutlineFromMarkdown } from '@/utils/outline'
 
 // Module-level singleton so the global hotkey layer and the dialog share state.
-const findText = ref('')
-const replaceText = ref('')
-const matchCase = ref(false)
-const replaceVisible = ref(false)
+interface FindState {
+  findText: string
+  replaceText: string
+  matchCase: boolean
+  replaceVisible: boolean
+}
+
+const findObs = makeReactive<FindState>({
+  findText: '',
+  replaceText: '',
+  matchCase: false,
+  replaceVisible: false,
+})
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -31,46 +40,63 @@ const winFind = window as unknown as {
  * Dialog *visibility* is owned by the host component (MdEditor renders FindDialog
  * on `useUI().findOpen`); `close()` only resets the replace-row state.
  */
-export function useFind() {
+export interface FindApi {
+  findText: { value: string }
+  replaceText: { value: string }
+  matchCase: { value: boolean }
+  replaceVisible: { value: boolean }
+  findNext: () => boolean
+  findPrev: () => boolean
+  replaceOne: () => Promise<void>
+  replaceAll: () => Promise<void>
+  close: () => void
+}
+
+export const findApi: FindApi = {
+  findText: refLike(findObs, 'findText'),
+  replaceText: refLike(findObs, 'replaceText'),
+  matchCase: refLike(findObs, 'matchCase'),
+  replaceVisible: refLike(findObs, 'replaceVisible'),
+
+  findNext: () => {
+    if (!findObs.get().findText) return false
+    return winFind.find(findObs.get().findText, findObs.get().matchCase, false, true)
+  },
+
+  findPrev: () => {
+    if (!findObs.get().findText) return false
+    return winFind.find(findObs.get().findText, findObs.get().matchCase, true, true)
+  },
+
+  async replaceOne(): Promise<void> {
+    await applyReplace(false)
+  },
+
+  async replaceAll(): Promise<void> {
+    await applyReplace(true)
+  },
+
+  close: () => {
+    findObs.set({ replaceVisible: false })
+  },
+}
+
+async function applyReplace(replaceAll: boolean): Promise<void> {
+  if (!findObs.get().findText) return
   const milkdown = useMilkdown()
   const editor = useEditorStore()
-
-  function findNext(): boolean {
-    if (!findText.value) return false
-    return winFind.find(findText.value, matchCase.value, false, true)
+  const md = (await milkdown.getMarkdown()) || editor.doc.content
+  const flags = findObs.get().matchCase ? (replaceAll ? 'g' : '') : replaceAll ? 'gi' : 'i'
+  const re = new RegExp(escapeRegex(findObs.get().findText), flags)
+  const replaced = md.replace(re, findObs.get().replaceText)
+  if (replaced !== md) {
+    editor.updateContent(replaced)
+    editor.setOutline(buildOutlineFromMarkdown(replaced))
+    await milkdown.loadMarkdown(replaced)
   }
+}
 
-  function findPrev(): boolean {
-    if (!findText.value) return false
-    return winFind.find(findText.value, matchCase.value, true, true)
-  }
-
-  async function applyReplace(replaceAll: boolean): Promise<void> {
-    if (!findText.value) return
-    const md = (await milkdown.getMarkdown()) || editor.doc.content
-    const flags = matchCase.value ? (replaceAll ? 'g' : '') : replaceAll ? 'gi' : 'i'
-    const re = new RegExp(escapeRegex(findText.value), flags)
-    const replaced = md.replace(re, replaceText.value)
-    if (replaced !== md) {
-      editor.updateContent(replaced)
-      editor.setOutline(buildOutlineFromMarkdown(replaced))
-      await milkdown.loadMarkdown(replaced)
-    }
-  }
-
-  function close(): void {
-    replaceVisible.value = false
-  }
-
-  return {
-    findText,
-    replaceText,
-    matchCase,
-    replaceVisible,
-    findNext,
-    findPrev,
-    replaceOne: () => applyReplace(false),
-    replaceAll: () => applyReplace(true),
-    close,
-  }
+export function useFind(): FindApi {
+  useStoreSubscription(findObs)
+  return findApi
 }

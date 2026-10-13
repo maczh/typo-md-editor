@@ -18,3 +18,5 @@ npm-debug.log*
 .idea/
 .vscode/*
 !.vscode/extensions.json
+.Trash-0/
+.Trash-0/info/win32-x64.trashinfo

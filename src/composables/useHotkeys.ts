@@ -1,7 +1,7 @@
-import { onMounted, onBeforeUnmount } from 'vue'
+import { useEffect } from 'react'
 import * as A from '@/commands/actions'
 import { useUI } from '@/composables/useUI'
-import { useSettingsStore } from '@/stores/settings'
+import { settingsStore } from '@/stores/settings'
 import { requestSave } from '@/composables/useSaveRequest'
 import type { HotkeySpec } from '@/types'
 
@@ -122,20 +122,18 @@ export const DEFAULT_HOTKEYS: Record<string, HotkeySpec> = Object.fromEntries(
 export const REBINDABLE: CommandDef[] = COMMAND_DEFS.filter((d) => d.run)
 
 /**
- * Effective bindings = user overrides merged over defaults. Reactive: callers
- * that read this inside a Vue computed track `settings.hotkeys`.
+ * Effective bindings = user overrides merged over defaults.
  *
- * Falls back to defaults (no overrides) when called before Pinia is active
- * (e.g. a module-level tooltip computed at import time).
+ * Reads `settings.hotkeys` from the **vanilla** zustand store (`getState`), so
+ * this is a pure function with no React Hook call. That is deliberate: it lets
+ * the helper be invoked from anywhere — a component's render body, a `useMemo`
+ * factory (see `EditorContextMenu`), an event handler, or the global key
+ * listener — without ever violating the Rules of Hooks. Callers that want to
+ * *subscribe* to hotkey changes should use the `useSettingsStore()` hook at
+ * their own top level instead.
  */
 export function getEffectiveHotkeys(): Record<string, HotkeySpec> {
-  let overrides: Record<string, HotkeySpec> | undefined
-  try {
-    overrides = useSettingsStore().settings.hotkeys
-  } catch {
-    overrides = undefined
-  }
-  const o = overrides || {}
+  const o = settingsStore.getState().settings.hotkeys || {}
   const out: Record<string, HotkeySpec> = {}
   for (const d of COMMAND_DEFS) out[d.id] = o[d.id] ?? d.default
   return out
@@ -220,41 +218,49 @@ function isField(el: EventTarget | null): boolean {
   return false
 }
 
-/** Install the global hotkey listener (MdEditor calls it when `hotkeys` is on). */
-export function useHotkeys(): void {
+/**
+ * Install the global hotkey listener. Call unconditionally from the editor root
+ * (pass `enabled` to honour the `hotkeys` prop); the listener is added/removed
+ * by React as the flag changes.
+ */
+export function useHotkeys(enabled = true): void {
   const ui = useUI()
 
-  function handler(e: KeyboardEvent): void {
-    const ctrl = e.ctrlKey || e.metaKey
-    const shift = e.shiftKey
-    const alt = e.altKey
-    const key = e.key.toLowerCase()
+  useEffect(() => {
+    if (!enabled) return
 
-    const effective = getEffectiveHotkeys()
-    for (const def of COMMAND_DEFS) {
-      if (!def.run) continue // display-only
-      const spec = effective[def.id]
-      if (!spec) continue
-      if (!!spec.ctrl !== ctrl) continue
-      if (!!spec.shift !== shift) continue
-      if (!!spec.alt !== alt) continue
-      if (spec.code) {
-        if (spec.code !== e.code) continue
-      } else if (spec.key !== key) continue
+    function handler(e: KeyboardEvent): void {
+      const ctrl = e.ctrlKey || e.metaKey
+      const shift = e.shiftKey
+      const alt = e.altKey
+      const key = e.key.toLowerCase()
 
-      const dialogsOpen = ui.settingsOpen.value || ui.findOpen.value
-      // While a modal dialog is open, only Save is permitted.
-      if (dialogsOpen && !(ctrl && key === 's')) return
+      const effective = getEffectiveHotkeys()
+      for (const def of COMMAND_DEFS) {
+        if (!def.run) continue // display-only
+        const spec = effective[def.id]
+        if (!spec) continue
+        if (!!spec.ctrl !== ctrl) continue
+        if (!!spec.shift !== shift) continue
+        if (!!spec.alt !== alt) continue
+        if (spec.code) {
+          if (spec.code !== e.code) continue
+        } else if (spec.key !== key) continue
 
-      // Non-global bindings only act when not typing in a field (i.e. in editor).
-      if (!def.global && isField(e.target)) return
+        const dialogsOpen = ui.settingsOpen.value || ui.findOpen.value
+        // While a modal dialog is open, only Save is permitted.
+        if (dialogsOpen && !(ctrl && key === 's')) return
 
-      e.preventDefault()
-      void def.run()
-      return
+        // Non-global bindings only act when not typing in a field (i.e. in editor).
+        if (!def.global && isField(e.target)) return
+
+        e.preventDefault()
+        void def.run()
+        return
+      }
     }
-  }
 
-  onMounted(() => window.addEventListener('keydown', handler))
-  onBeforeUnmount(() => window.removeEventListener('keydown', handler))
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [enabled, ui])
 }

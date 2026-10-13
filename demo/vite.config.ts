@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
+import react from '@vitejs/plugin-react'
 import fs from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 
@@ -20,10 +20,17 @@ function watchNeedsPolling(): boolean {
 // demo 开发宿主（独立 Vite 应用）：库构建与 demo 构建彻底分离。
 // 端口固定 1420/1421（同源项目约定），相对 base 保证静态部署可用。
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [react()],
   root: './demo',
   base: './',
   clearScreen: false,
+  // 同根 vite.config.ts：Crepe 内置 Vue 运行时，手动注入其 esm-bundler 特性开关，
+  // 消除 dev / build 时刷出的 __VUE_OPTIONS_API__ 等告警。
+  define: {
+    __VUE_OPTIONS_API__: true,
+    __VUE_PROD_DEVTOOLS__: false,
+    __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
+  },
   server: {
     port: 1420,
     strictPort: true,
@@ -52,8 +59,6 @@ export default defineConfig({
       '@': fileURLToPath(new URL('../src', import.meta.url)),
     },
   },
-  // 预打包 Mermaid + CodeMirror 主题 + language-data（Crepe 代码块按语言懒加载），
-  // 避免会话中动态 import 触发重复优化（同源项目实践）。
   optimizeDeps: {
     include: ['mermaid', '@codemirror/theme-one-dark', '@codemirror/language-data'],
   },

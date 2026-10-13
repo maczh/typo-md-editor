@@ -1,26 +1,31 @@
-import type { App } from 'vue'
-import { createPinia, getActivePinia, setActivePinia } from 'pinia'
-import { i18n as typoI18n } from './i18n'
+import type { ReactNode } from 'react'
+import { i18n as typoI18n, SUPPORTED_LANGS, useTranslation, TypoI18nProvider } from './i18n'
+
+export { typoI18n, SUPPORTED_LANGS, useTranslation, TypoI18nProvider }
 
 /**
- * 确保存在活跃的 pinia 实例。
+ * 确保存在活跃的 store 实例。
  *
- * 组件内部防御性调用：宿主忘装 `app.use(createPinia())` 时 store 仍可工作；
- * 已安装则为无操作（不会覆盖宿主的 pinia）。
+ * 在 Vue/Pinia 时代这里会创建一个兜底 Pinia；React 端口使用 zustand，store 是
+ * 模块级单例、无需激活，因此此处为幂等空操作，仅保留 API 兼容性（宿主仍可防御性
+ * 调用）。
  */
-export function ensurePinia(): void {
-  if (!getActivePinia()) setActivePinia(createPinia())
+export function ensureStore(): void {
+  /* intentionally empty — zustand stores are module-level singletons */
+}
+
+/** 可选 React Provider —— 当前只是透传 children，并在挂载时确保 store 就绪。 */
+export function TypoProvider({ children }: { children: ReactNode }): ReactNode {
+  ensureStore()
+  return children
 }
 
 /**
- * 一键安装插件：装 i18n + 缺省时建 pinia。
- *
- * 标准装法：`app.use(createPinia()).use(typoPlugin)`
- * （宿主即使不显式装 pinia，ensurePinia 也会兜底）。
+ * 一键安装插件（兼容 Vue 时代的 `app.use(typoPlugin)` 用法；React 宿主无需安装，
+ * 但保留该导出以便平滑迁移）。
  */
 export const typoPlugin = {
-  install(app: App): void {
-    ensurePinia()
-    app.use(typoI18n)
+  install(): void {
+    ensureStore()
   },
 }

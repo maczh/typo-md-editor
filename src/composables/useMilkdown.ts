@@ -1,12 +1,16 @@
-import { ref } from 'vue'
 import type { Editor } from '@milkdown/core'
 import { createEditor, type EditorInstance } from '@/milkdown/setup'
 import type { ImageUploader } from '@/utils/images'
+import { makeReactive, refLike, useStoreSubscription } from '@/composables/useStoreSafe'
 
 // Module-level shared state so every component (EditorPane, ImageHandler,
 // TableToolbar, export) operates on the same editor instance.
-const instance = ref<EditorInstance | null>(null)
-const isReady = ref(false)
+interface MilkdownState {
+  instance: EditorInstance | null
+  isReady: boolean
+}
+
+const milkObs = makeReactive<MilkdownState>({ instance: null, isReady: false })
 
 /**
  * Shared Milkdown controller. Returns the singleton editor instance and helpers.
@@ -16,57 +20,58 @@ const isReady = ref(false)
  * `createEditor`; the component flow instead injects the uploader globally via
  * `setImageUploader` (MdEditor's `onUpload` prop), which `image-block` reads.
  */
-export function useMilkdown() {
-  async function mount(
+export interface MilkdownApi {
+  instance: { value: EditorInstance | null }
+  isReady: { value: boolean }
+  mount: (
     container: HTMLElement,
-    defaultValue = '',
+    defaultValue?: string,
     onChange?: (markdown: string) => void,
     onUpload?: ImageUploader,
-  ): Promise<void> {
-    instance.value = await createEditor(container, defaultValue, { onChange, onUpload })
-    isReady.value = true
+  ) => Promise<void>
+  getMarkdown: () => Promise<string> | string
+  loadMarkdown: (md: string) => void
+  getHTML: () => Promise<string> | string
+  getEditor: () => Editor | null
+  insert: (md: string) => void
+  destroy: () => void
+}
+
+export const milkApi: MilkdownApi = {
+  instance: refLike(milkObs, 'instance'),
+  isReady: refLike(milkObs, 'isReady'),
+
+  async mount(container, defaultValue = '', onChange, onUpload) {
+    const inst = await createEditor(container, defaultValue, { onChange, onUpload })
+    milkObs.set({ instance: inst, isReady: true })
     // Opt-in handle so automated probes can drive the editor. Only exposed when the
     // URL carries `?e2e=1`, so it has no effect in normal use or production.
     if (typeof location !== 'undefined' && location.search.includes('e2e=1')) {
-      ;(window as unknown as { __typo?: EditorInstance }).__typo = instance.value
+      ;(window as unknown as { __typo?: EditorInstance }).__typo = inst
     }
-  }
+  },
 
-  function getMarkdown(): Promise<string> | string {
-    return instance.value?.getMarkdown() ?? ''
-  }
+  getMarkdown: () => milkObs.get().instance?.getMarkdown() ?? '',
 
-  function loadMarkdown(md: string): void {
-    instance.value?.loadMarkdown(md)
-  }
+  loadMarkdown: (md: string) => {
+    milkObs.get().instance?.loadMarkdown(md)
+  },
 
-  function getHTML(): Promise<string> | string {
-    return instance.value?.getHTML() ?? ''
-  }
+  getHTML: () => milkObs.get().instance?.getHTML() ?? '',
 
-  function getEditor(): Editor | null {
-    return instance.value?.getEditor() ?? null
-  }
+  getEditor: () => milkObs.get().instance?.getEditor() ?? null,
 
-  function insert(md: string): void {
-    instance.value?.insert(md)
-  }
+  insert: (md: string) => {
+    milkObs.get().instance?.insert(md)
+  },
 
-  function destroy(): void {
-    instance.value?.destroy()
-    instance.value = null
-    isReady.value = false
-  }
+  destroy: () => {
+    milkObs.get().instance?.destroy()
+    milkObs.set({ instance: null, isReady: false })
+  },
+}
 
-  return {
-    instance,
-    isReady,
-    mount,
-    getMarkdown,
-    loadMarkdown,
-    getHTML,
-    getEditor,
-    insert,
-    destroy,
-  }
+export function useMilkdown(): MilkdownApi {
+  useStoreSubscription(milkObs)
+  return milkApi
 }

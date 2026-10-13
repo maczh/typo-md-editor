@@ -1,7 +1,6 @@
-import { ref } from 'vue'
+import { makeReactive, refLike, useStoreSubscription } from '@/composables/useStoreSafe'
 import { useMilkdown } from '@/composables/useMilkdown'
 import { useEditorStore } from '@/stores/editor'
-import { useUI } from '@/composables/useUI'
 import { buildOutlineFromMarkdown } from '@/utils/outline'
 
 /**
@@ -9,23 +8,40 @@ import { buildOutlineFromMarkdown } from '@/utils/outline'
  * snapshot the live Markdown; when leaving we push the edited text back into the
  * editor and refresh the document store + outline.
  */
-export function useSourceMode() {
-  const milkdown = useMilkdown()
-  const editor = useEditorStore()
-  const ui = useUI()
-  const sourceText = ref('')
+interface SourceState {
+  sourceText: string
+}
 
-  async function enter(): Promise<void> {
+const sourceObs = makeReactive<SourceState>({ sourceText: '' })
+
+export interface SourceModeApi {
+  sourceText: { value: string }
+  enter: () => Promise<void>
+  commit: () => Promise<void>
+}
+
+export const sourceApi: SourceModeApi = {
+  sourceText: refLike(sourceObs, 'sourceText'),
+
+  async enter(): Promise<void> {
+    const milkdown = useMilkdown()
+    const editor = useEditorStore()
     const md = await milkdown.getMarkdown()
-    sourceText.value = typeof md === 'string' ? md : editor.doc.content
-  }
+    sourceObs.set({
+      sourceText: typeof md === 'string' ? md : editor.doc.content,
+    })
+  },
 
-  async function commit(): Promise<void> {
-    const md = sourceText.value
+  async commit(): Promise<void> {
+    const md = sourceObs.get().sourceText
+    const editor = useEditorStore()
     editor.updateContent(md)
     editor.setOutline(buildOutlineFromMarkdown(md))
-    await milkdown.loadMarkdown(md)
-  }
+    await useMilkdown().loadMarkdown(md)
+  },
+}
 
-  return { sourceText, enter, commit }
+export function useSourceMode(): SourceModeApi {
+  useStoreSubscription(sourceObs)
+  return sourceApi
 }
