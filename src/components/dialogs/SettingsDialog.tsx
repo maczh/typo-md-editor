@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '@/stores/settings'
 import {
   REBINDABLE,
@@ -91,11 +91,18 @@ export default function SettingsDialog({ modelValue = true, onClose }: SettingsD
     setCapturingId(null)
   }
 
+  // Keep a live ref to the latest onCapture so the window-level keydown
+  // listener (registered once on mount) always sees the current capture state
+  // instead of the stale mount-time closure (which would otherwise keep
+  // `capturingId` frozen at its initial null and make rebinding dead).
+  const onCaptureRef = useRef(onCapture)
+  onCaptureRef.current = onCapture
   useEffect(() => {
     setForm({ ...settingsStore.settings })
     initDraft()
-    window.addEventListener('keydown', onCapture, true)
-    return () => window.removeEventListener('keydown', onCapture, true)
+    const handler = (e: KeyboardEvent) => onCaptureRef.current(e)
+    window.addEventListener('keydown', handler, true)
+    return () => window.removeEventListener('keydown', handler, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
