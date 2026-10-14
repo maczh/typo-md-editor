@@ -59,4 +59,12 @@ export type {
 } from './types'
 
 // ── 组件样式（原 SFC <style scoped> 块；随库打包进 dist/style.css）────
+// 引入顺序即覆盖顺序，必须与 demo/main.tsx 保持一致（共享约定 §9.5）：
+//   variables → app → Crepe 主题 → mermaid → typora → components
+// app.css 首行 @import './variables.css'，构建时被内联，保证 token 先行且不重复；
+// Crepe 自带主题（@milkdown/crepe/theme/common/style.css + nord.css）由宿主引入，
+// 必须位于本包 style.css 之前，typora.css 才能靠顺序覆盖它。
+import './styles/app.css'
+import './styles/mermaid.css'
+import './styles/typora.css'
 import './styles/components.css'
