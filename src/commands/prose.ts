@@ -1,5 +1,5 @@
 import type { Editor } from '@milkdown/core'
-import { commandsCtx, editorViewCtx } from '@milkdown/core'
+import { commandsCtx, editorViewCtx, serializerCtx } from '@milkdown/core'
 import { toggleInlineCodeCommand } from '@milkdown/preset-commonmark'
 import type { EditorView } from '@milkdown/prose/view'
 import type { Node as PMNode, NodeType, MarkType } from '@milkdown/prose/model'
@@ -100,16 +100,31 @@ export function setParagraph(editor: Editor): void {
   })
 }
 
-/** Increase (delta > 0) / decrease (delta < 0) the current heading level. */
+/**
+ * Promote (delta < 0) / demote (delta > 0) the caret's heading — i.e. move it
+ * *towards* H1 / towards H6, which is what the 提升/降低标题级别 labels and the
+ * Ctrl+= / Ctrl+- shortcuts promise (zoom-button intuition: "=" makes the
+ * heading bigger).
+ *
+ * On a plain paragraph there is no level to bump, so the fallback mirrors the
+ * shortcut: promoting yields the biggest heading (H1), demoting the smallest
+ * (H6). (The fallback used to be keyed the other way round, which made Ctrl+=
+ * produce H6 and Ctrl+- produce H1 on a paragraph — exactly backwards.)
+ *
+ * Like every other block command this lifts the line out of a list first:
+ * Markdown cannot nest a heading inside a list item, so without the lift the
+ * command silently no-ops on a list line.
+ */
 export function bumpHeading(editor: Editor, delta: number): void {
   runWithView(editor, (view) => {
     const h = nodeType(view.state.schema, 'heading')
     if (!h) return
+    liftFromList(view)
     const parent = view.state.selection.$from.parent
     const level =
       parent.type.name === 'heading'
         ? Math.min(6, Math.max(1, Number((parent.attrs as { level?: number }).level ?? 1) + delta))
-        : delta > 0
+        : delta < 0
           ? 1
           : 6
     setBlockType(h, { level })(view.state, view.dispatch)
@@ -255,6 +270,10 @@ export type TaskStatus = 'selected' | 'unselected' | 'ignored'
  *  - `unselected` → `[ ]`
  *  - `ignored`    → `[-]` (stored as a null `checked` attr; the schema only
  *    distinguishes boolean|null, so this is the closest representation).
+ *
+ * The item test must check the *value* of `checked`, not its presence: the GFM
+ * preset extends every `list_item` with a `checked` attr (null for ordinary
+ * items), so `'checked' in attrs` would match plain bullets too.
  */
 export function setTaskStatus(editor: Editor, status: TaskStatus): void {
   runWithView(editor, (view) => {
@@ -262,7 +281,8 @@ export function setTaskStatus(editor: Editor, status: TaskStatus): void {
     const $from = state.selection.$from
     for (let d = $from.depth; d > 0; d -= 1) {
       const node = $from.node(d)
-      if (node.type.name === 'list_item' && 'checked' in node.attrs) {
+      const current = (node.attrs as { checked?: boolean | null }).checked
+      if (node.type.name === 'list_item' && current !== null && current !== undefined) {
         const pos = $from.before(d)
         const checked = status === 'selected' ? true : status === 'unselected' ? false : null
         const tr = state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, checked })
@@ -761,6 +781,68 @@ export function isNodeActive(
     }
   })
   return active
+}
+
+/**
+ * Whether the caret sits inside a **task-list item**.
+ *
+ * Milkdown 7's GFM preset has no separate `task_list` node: it *extends*
+ * `list_item` with a `checked` attribute, so every list item carries `checked`
+ * — `null` for ordinary items, `true`/`false` for task items. Probing for a
+ * `task_list` node therefore never matches (and a bare `'checked' in attrs`
+ * test matches every bullet), which is how the toolbar's task button ended up
+ * permanently inert — and, via its old `|| bullet_list` fallback, lit on every
+ * plain bullet list.
+ */
+export function isTaskItemActive(editor: Editor | null): boolean {
+  if (!editor) return false
+  let active = false
+  runWithView(editor, (view) => {
+    const $from = view.state.selection.$from
+    for (let d = $from.depth; d > 0; d -= 1) {
+      const node = $from.node(d)
+      const checked = (node.attrs as { checked?: boolean | null }).checked
+      if (node.type.name === 'list_item' && checked !== null && checked !== undefined) {
+        active = true
+        return
+      }
+    }
+  })
+  return active
+}
+
+/**
+ * Serialize the current **selection** to Markdown (null when the caret is
+ * collapsed or the editor is unavailable).
+ *
+ * This is what "复制为 Markdown" must copy — the previous implementation
+ * serialized the whole document, so the button silently ignored the selection.
+ * The implementation mirrors Milkdown's own clipboard plugin
+ * (`clipboardTextSerializer`): wrap the selection slice in a throwaway doc via
+ * `topNodeType.createAndFill` and run the editor's serializer over it. When the
+ * slice cannot form a valid doc (e.g. a partial table row) it degrades to the
+ * selection's plain text instead of throwing.
+ */
+export function selectionMarkdown(editor: Editor | null): string | null {
+  if (!editor) return null
+  let out: string | null = null
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx) as EditorView
+    const { selection } = view.state
+    if (selection.empty) return
+    const slice = selection.content()
+    if (slice.content.size === 0) return
+    const serializer = ctx.get(serializerCtx) as unknown as ((node: PMNode) => string) | undefined
+    const fallback = (): string =>
+      view.state.doc.textBetween(selection.from, selection.to, '\n\n')
+    if (typeof serializer !== 'function') {
+      out = fallback()
+      return
+    }
+    const doc = view.state.schema.topNodeType.createAndFill(null, slice.content)
+    out = doc ? serializer(doc) : fallback()
+  })
+  return out
 }
 
 /* ------------------------------------------------------------------ */

@@ -1,4 +1,7 @@
-/* demo 外壳布局（编辑器样式由 src/styles/* 提供）。 */
+/* demo 外壳布局（编辑器样式由 src/styles/* 提供）。
+   全部颜色 / 尺寸走包内设计令牌（--bg / --panel-bg / --border / --shadow …），
+   主题切换时自动跟随，无需为 demo 单独维护一套色值。 */
+
 html,
 body,
 #app {
@@ -18,4 +21,173 @@ body {
 #app {
   display: flex;
   flex-direction: column;
+}
+
+/* ------------------------------- 外壳骨架 ------------------------------- */
+.demo-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ------------------------------- 顶部操作栏 ------------------------------- */
+.demo-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-bg);
+}
+
+.demo-brand {
+  font-weight: 700;
+  font-size: 15px;
+  margin-right: 6px;
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.demo-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.demo-field select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 6px;
+}
+
+.demo-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* --------------------------- 主体：编辑区 + 大纲边栏 --------------------------- */
+.demo-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  padding: 12px 12px 12px 0;
+}
+
+.demo-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+/* MdEditor 根节点撑满主列 */
+.demo-main .md-editor {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* 右侧浮动大纲边栏：独立卡片 + 阴影，贴右边缘悬浮 */
+.demo-side {
+  flex: 0 0 var(--panel-width);
+  width: var(--panel-width);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.demo-side-title {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-bg);
+}
+
+/* OutlinePanel 占满剩余高度并独立滚动 */
+.demo-side .outline-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* ------------------------------- 底部状态行 ------------------------------- */
+.demo-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 5px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-bg);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.demo-hint {
+  margin-left: auto;
+}
+
+/* ------------------------------- 响应式 ------------------------------- */
+/* 窄屏：边栏改为悬浮覆盖层，不挤占编辑区宽度 */
+@media (max-width: 1024px) {
+  .demo-body {
+    padding-right: 0;
+  }
+
+  .demo-side {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: 200px;
+    flex-basis: 200px;
+    z-index: 5;
+  }
 }

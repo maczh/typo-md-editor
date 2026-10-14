@@ -41,7 +41,14 @@ const LANGUAGES: { value: Lang; label: string }[] = [
   { value: 'en', label: 'English' },
   { value: 'zh-TW', label: '繁體中文' },
 ]
-const MODES: EditorMode[] = ['normal', 'focus', 'typewriter', 'source']
+// 'source' used to be offered here, but `settings.mode` cannot enter source
+// mode — that is toggled by Ctrl+/ (`useUI.sourceMode`), not by this setting.
+// Picking it only added a dead CSS class, so the option is gone.
+const MODES: { value: EditorMode; labelKey: string }[] = [
+  { value: 'normal', labelKey: 'menu.normalMode' },
+  { value: 'focus', labelKey: 'menu.focusMode' },
+  { value: 'typewriter', labelKey: 'menu.typewriterMode' },
+]
 
 export default function SettingsDialog({ modelValue = true, onClose }: SettingsDialogProps) {
   const { t } = useTranslation()
@@ -224,11 +231,11 @@ export default function SettingsDialog({ modelValue = true, onClose }: SettingsD
               <label>{t('dialog.settings.mode')}</label>
               <select
                 value={form.mode}
-                onChange={(e) => setForm((f) => ({ ...f, mode: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, mode: e.target.value as EditorMode }))}
               >
                 {MODES.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
+                  <option key={m.value} value={m.value}>
+                    {t(m.labelKey)}
                   </option>
                 ))}
               </select>

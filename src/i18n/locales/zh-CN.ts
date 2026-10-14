@@ -206,6 +206,14 @@ export default {
     image: '图片',
     source: '源码',
   },
+  tableToolbar: {
+    row: '行',
+    column: '列',
+    addRow: '在下方添加行',
+    removeRow: '删除当前行',
+    addColumn: '在右侧添加列',
+    removeColumn: '删除当前列',
+  },
   editor: {
     resizeHint: '拖拽调整编辑区宽度（双击恢复 80%）',
     codeCopy: '复制',

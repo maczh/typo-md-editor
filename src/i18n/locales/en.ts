@@ -206,6 +206,14 @@ export default {
     image: 'Image',
     source: 'Source',
   },
+  tableToolbar: {
+    row: 'Row',
+    column: 'Column',
+    addRow: 'Add row below',
+    removeRow: 'Remove row',
+    addColumn: 'Add column right',
+    removeColumn: 'Remove column',
+  },
   editor: {
     resizeHint: 'Drag to resize the editor column (double-click to reset to 80%)',
     codeCopy: 'Copy',

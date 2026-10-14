@@ -206,6 +206,14 @@ export default {
     image: '圖片',
     source: '原始碼',
   },
+  tableToolbar: {
+    row: '行',
+    column: '列',
+    addRow: '在下方新增行',
+    removeRow: '刪除目前行',
+    addColumn: '在右側新增列',
+    removeColumn: '刪除目前列',
+  },
   editor: {
     resizeHint: '拖曳調整編輯區寬度（雙擊回復 80%）',
     codeCopy: '複製',

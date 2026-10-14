@@ -105,6 +105,9 @@ export async function createEditor(
   let crepe: Crepe | null = null
   let loading = false
   let loadSequence = 0
+  // Set by destroy() so a discarded instance (e.g. superseded by a newer mount
+  // during a StrictMode remount) stops reacting to container-level events.
+  let destroyed = false
 
   const attach = (instance: Crepe) => {
     instance.on((api) => {
@@ -138,39 +141,37 @@ export async function createEditor(
   // the editable) in the *capture* phase so it runs before ProseMirror's own
   // paste handler, letting us replace the default rich-HTML insertion with a
   // Markdown round-trip. Plain-text paste is left untouched.
-  root.addEventListener(
-    'paste',
-    (e: ClipboardEvent) => {
-      const dt = e.clipboardData
-      if (!dt) return
-      const html = dt.getData('text/html')
-      if (!html || !html.trim()) return // plain text — let the default happen
-      const editor = getCoreEditor(crepe)
-      if (!editor) return
-      // Inside a code block the user wants literal text, not Markdown — bail.
-      let inCode = false
-      editor.action((ctx) => {
-        const view = ctx.get(editorViewCtx) as EditorView
-        const parent = view.state.selection.$from.parent
-        inCode = parent.type.name === 'code_block' || parent.type.name === 'fence'
-      })
-      if (inCode) return
-      e.preventDefault()
-      // Stop the event before it reaches the editable element so ProseMirror's
-      // own paste handler (which would insert the raw HTML) never runs — without
-      // this the converted Markdown would be inserted *and* the original HTML.
-      e.stopPropagation()
-      const md = htmlToMarkdown(html)
-      if (!md) {
-        // Conversion produced nothing useful — fall back to plain text.
-        const text = dt.getData('text/plain')
-        if (text) editor.action(insert(text))
-        return
-      }
-      editor.action(insert(md))
-    },
-    true,
-  )
+  const onPaste = (e: ClipboardEvent): void => {
+    if (destroyed) return
+    const dt = e.clipboardData
+    if (!dt) return
+    const html = dt.getData('text/html')
+    if (!html || !html.trim()) return // plain text — let the default happen
+    const editor = getCoreEditor(crepe)
+    if (!editor) return
+    // Inside a code block the user wants literal text, not Markdown — bail.
+    let inCode = false
+    editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx) as EditorView
+      const parent = view.state.selection.$from.parent
+      inCode = parent.type.name === 'code_block' || parent.type.name === 'fence'
+    })
+    if (inCode) return
+    e.preventDefault()
+    // Stop the event before it reaches the editable element so ProseMirror's
+    // own paste handler (which would insert the raw HTML) never runs — without
+    // this the converted Markdown would be inserted *and* the original HTML.
+    e.stopPropagation()
+    const md = htmlToMarkdown(html)
+    if (!md) {
+      // Conversion produced nothing useful — fall back to plain text.
+      const text = dt.getData('text/plain')
+      if (text) editor.action(insert(text))
+      return
+    }
+    editor.action(insert(md))
+  }
+  root.addEventListener('paste', onPaste, true)
 
   const getMarkdown = (): Promise<string> | string =>
     crepe ? (crepe as unknown as { getMarkdown: () => Promise<string> }).getMarkdown() : ''
@@ -210,6 +211,8 @@ export async function createEditor(
     })()
   }
   const destroy = () => {
+    destroyed = true
+    root.removeEventListener('paste', onPaste, true)
     ;(crepe as unknown as { destroy: () => void } | null)?.destroy()
     crepe = null
   }

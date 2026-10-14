@@ -51,6 +51,14 @@ function EditorPane({ showTableToolbar = true, showContextMenu = true }: EditorP
   const editorMenu = useEditorMenu()
   const handlePressRef = useRef<HandlePress | null>(null)
   const [dragging, setDragging] = useState(false)
+  // The document-level listeners are registered once (mount), so they read the
+  // prop through a ref: `showContextMenu={false}` must restore the native
+  // right-click menu AND Crepe's own "+" handle behaviour (insert blank line +
+  // slash menu), not just hide our overlay.
+  const showCtxRef = useRef(showContextMenu)
+  useEffect(() => {
+    showCtxRef.current = showContextMenu
+  }, [showContextMenu])
 
   const MIN_WIDTH = 30
   const MAX_WIDTH = 100
@@ -101,6 +109,7 @@ function EditorPane({ showTableToolbar = true, showContextMenu = true }: EditorP
   }
 
   function onContextMenu(e: MouseEvent): void {
+    if (!showCtxRef.current) return
     const editor = milkdown.getEditor()
     if (!editor || !containerRef.current) return
     const target = e.target as Node | null
@@ -166,7 +175,11 @@ function EditorPane({ showTableToolbar = true, showContextMenu = true }: EditorP
   }
 
   function openPlusMenu(pos: number, clientX: number, clientY: number): void {
-    openHandleMenu(pos, clientX, clientY, 'insert', () => {
+    // "+" adds a NEW line, so the menu opens on the block-style submenu
+    // (正文/标题…) — the user picks the style of the line that `beforeRun`
+    // creates only once an item is chosen. The insert submenu stays one hover
+    // away for content blocks (image/table/divider/…).
+    openHandleMenu(pos, clientX, clientY, 'style', () => {
       const editor = milkdown.getEditor()
       if (!editor) return
       const caret = insertBlockAfter(editor, pos)
@@ -186,6 +199,7 @@ function EditorPane({ showTableToolbar = true, showContextMenu = true }: EditorP
   }
 
   function onHandlePointerDown(e: PointerEvent): void {
+    if (!showCtxRef.current) return
     const item = handleItemOf(e.target)
     if (item < 0) return
     handlePressRef.current = {
@@ -204,15 +218,38 @@ function EditorPane({ showTableToolbar = true, showContextMenu = true }: EditorP
   }
 
   function onHandlePointerUp(e: PointerEvent): void {
-    const item = handleItemOf(e.target)
-    if (item < 0) return
+    // Feature off: bail BEFORE the preventDefault below so Crepe's native
+    // "+" (insert blank line + slash menu) keeps working untouched.
+    if (!showCtxRef.current) return
     const press = handlePressRef.current
     handlePressRef.current = null
-    if (press && (Math.abs(e.clientX - press.x) > 4 || Math.abs(e.clientY - press.y) > 4)) return
+    const item = handleItemOf(e.target)
+    const moved =
+      press != null && (Math.abs(e.clientX - press.x) > 4 || Math.abs(e.clientY - press.y) > 4)
 
-    if (item === 0) e.preventDefault()
-    e.stopPropagation()
+    // Released off the handle entirely: nothing of ours to open, and Crepe's
+    // element-scoped pointerup cannot fire either — drop the gesture.
+    if (item < 0) return
+
+    // The release lands on a handle button — exactly where Crepe's own
+    // pointerup listener sits (the "+" runs `onAdd`: insert a blank line and
+    // open the slash menu). While our menu owns the handle, that native
+    // behaviour must NEVER fire — not even for a sloppy click that drifted a
+    // few pixels between press and release (a very common real-mouse gesture,
+    // and the "+" button is 32px wide so a small drift still lands on it).
+    // So suppress unconditionally. Exception: a genuine "::" drag (press and
+    // release both on "::" with movement) belongs to BlockProvider's native
+    // HTML5 drag (mousedown/dragstart) and passes through untouched.
+    const isHandleDrag = item === 1 && press?.item === 1 && moved
+    if (!isHandleDrag) {
+      if (item === 0 || press?.item === 0) e.preventDefault()
+      e.stopPropagation()
+    }
     ;(e.target as HTMLElement | null)?.closest('.operation-item')?.classList.remove('active')
+    if (isHandleDrag) return
+
+    // A press on "+" that drifted onto "::" is not a menu gesture either.
+    if (moved && item !== 0) return
 
     const pos = resolveHandlePos(press?.pos ?? null)
     if (pos == null) return
