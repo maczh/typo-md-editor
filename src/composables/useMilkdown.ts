@@ -2,6 +2,7 @@ import type { Editor } from '@milkdown/core'
 import { createEditor, type EditorInstance } from '@/milkdown/setup'
 import type { ImageUploader } from '@/utils/images'
 import { makeReactive, refLike, useStoreSubscription } from '@/composables/useStoreSafe'
+import { createMountSequence } from '@/composables/mountSequence'
 
 // Module-level shared state so every component (EditorPane, ImageHandler,
 // TableToolbar, export) operates on the same editor instance.
@@ -11,6 +12,14 @@ interface MilkdownState {
 }
 
 const milkObs = makeReactive<MilkdownState>({ instance: null, isReady: false })
+
+/**
+ * Serialises asynchronous `mount()` calls so React 18 StrictMode's
+ * mount → cleanup → mount cycle cannot leave two editors in one container
+ * (duplicate document + dead handles on the orphaned copy). See
+ * {@link createMountSequence} for the full rationale.
+ */
+const mountSeq = createMountSequence()
 
 /**
  * Shared Milkdown controller. Returns the singleton editor instance and helpers.
@@ -42,7 +51,14 @@ export const milkApi: MilkdownApi = {
   isReady: refLike(milkObs, 'isReady'),
 
   async mount(container, defaultValue = '', onChange, onUpload) {
+    const token = mountSeq.next()
     const inst = await createEditor(container, defaultValue, { onChange, onUpload })
+    if (!mountSeq.isCurrent(token)) {
+      // Superseded by a newer mount() or by destroy() (StrictMode remount):
+      // tear this instance down so it never reaches the shared container.
+      inst.destroy()
+      return
+    }
     milkObs.set({ instance: inst, isReady: true })
     // Opt-in handle so automated probes can drive the editor. Only exposed when the
     // URL carries `?e2e=1`, so it has no effect in normal use or production.
@@ -66,6 +82,9 @@ export const milkApi: MilkdownApi = {
   },
 
   destroy: () => {
+    // Invalidate in-flight mounts first: a createEditor that resolves after
+    // this point must discard itself instead of publishing a second editor.
+    mountSeq.invalidate()
     milkObs.get().instance?.destroy()
     milkObs.set({ instance: null, isReady: false })
   },

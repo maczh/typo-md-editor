@@ -297,7 +297,7 @@ export default function EditorContextMenu() {
           </button>
           <button
             type="button"
-            className={nodeActive('task_list') ? 'active' : ''}
+            className={A.taskItemActive() ? 'active' : ''}
             title={t('ctx.taskList')}
             aria-label={t('ctx.taskList')}
             onClick={() => run(A.insertTaskList)}

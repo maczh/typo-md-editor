@@ -52,7 +52,8 @@ export const COMMAND_DEFS: CommandDef[] = [
   { id: 'preferences', labelKey: 'menu.preferences', default: { ctrl: true, key: ',' }, run: A.openPreferences, global: true },
   { id: 'sourceMode', labelKey: 'menu.sourceMode', default: { ctrl: true, key: '/' }, run: A.toggleSourceMode, global: true },
   { id: 'find', labelKey: 'menu.find', default: { ctrl: true, key: 'f' }, run: A.openFind, global: true },
-  { id: 'replace', labelKey: 'menu.replace', default: { ctrl: true, key: 'h' }, run: A.openFind, global: true },
+  // 替换 opens the same bar with the replace row expanded — `openFind(false)`.
+  { id: 'replace', labelKey: 'menu.replace', default: { ctrl: true, key: 'h' }, run: () => A.openFind(false), global: true },
 
   // ── Paragraph / blocks ──────────────────────────────────────────
   { id: 'paragraph', labelKey: 'menu.paragraph', default: { ctrl: true, key: '0' }, run: A.setParagraph },
@@ -65,6 +66,9 @@ export const COMMAND_DEFS: CommandDef[] = [
   { id: 'incHeading', labelKey: 'menu.incHeading', default: { ctrl: true, key: '=' }, run: A.increaseHeadingLevel },
   { id: 'decHeading', labelKey: 'menu.decHeading', default: { ctrl: true, key: '-' }, run: A.decreaseHeadingLevel },
   { id: 'insertTable', labelKey: 'menu.insertTable', default: { ctrl: true, key: 't' }, run: A.insertTable },
+  // The toolbar's image button and the context menu's 图像 item both advertise
+  // Ctrl+Shift+I — it was never registered here, so the shortcut did nothing.
+  { id: 'insertLocalImage', labelKey: 'menu.insertLocalImage', default: { ctrl: true, shift: true, key: 'i' }, run: A.insertLocalImage },
   { id: 'mathBlock', labelKey: 'menu.insertMath', default: { ctrl: true, shift: true, key: 'm' }, run: A.insertMathBlock },
   { id: 'codeBlock', labelKey: 'menu.codeBlock', default: { ctrl: true, shift: true, key: 'k' }, run: A.insertCodeBlock },
   { id: 'quote', labelKey: 'menu.quote', default: { ctrl: true, shift: true, key: 'q' }, run: A.insertBlockquote },
@@ -104,13 +108,15 @@ export const COMMAND_DEFS: CommandDef[] = [
   { id: 'paste', labelKey: 'menu.paste', default: { ctrl: true, key: 'v' } },
   { id: 'selectAll', labelKey: 'menu.selectAll', default: { ctrl: true, key: 'a' } },
 
-  // ── Table submenu (display hints; not yet bound to the editor) ──
-  { id: 'table-row-below', labelKey: 'ctx.rowBelow', default: { ctrl: true, key: 'enter' } },
-  { id: 'table-move-row-up', labelKey: 'ctx.moveRowUp', default: { alt: true, ctrl: true, key: 'arrowup' } },
-  { id: 'table-move-row-down', labelKey: 'ctx.moveRowDown', default: { alt: true, ctrl: true, key: 'arrowdown' } },
-  { id: 'table-move-col-left', labelKey: 'ctx.moveColLeft', default: { alt: true, ctrl: true, key: 'arrowleft' } },
-  { id: 'table-move-col-right', labelKey: 'ctx.moveColRight', default: { alt: true, ctrl: true, key: 'arrowright' } },
-  { id: 'table-del-row', labelKey: 'ctx.deleteRow', default: { ctrl: true, shift: true, key: 'backspace' } },
+  // ── Table submenu (right-click / block-handle menu inside a table) ──
+  // These are shown as shortcuts in the context menu's table submenu, so they
+  // are bound for real — the actions already existed in `commands/actions.ts`.
+  { id: 'table-row-below', labelKey: 'ctx.rowBelow', default: { ctrl: true, key: 'enter' }, run: A.tableRowBelow },
+  { id: 'table-move-row-up', labelKey: 'ctx.moveRowUp', default: { alt: true, ctrl: true, key: 'arrowup' }, run: A.tableMoveRowUp },
+  { id: 'table-move-row-down', labelKey: 'ctx.moveRowDown', default: { alt: true, ctrl: true, key: 'arrowdown' }, run: A.tableMoveRowDown },
+  { id: 'table-move-col-left', labelKey: 'ctx.moveColLeft', default: { alt: true, ctrl: true, key: 'arrowleft' }, run: A.tableMoveColLeft },
+  { id: 'table-move-col-right', labelKey: 'ctx.moveColRight', default: { alt: true, ctrl: true, key: 'arrowright' }, run: A.tableMoveColRight },
+  { id: 'table-del-row', labelKey: 'ctx.deleteRow', default: { ctrl: true, shift: true, key: 'backspace' }, run: A.tableDeleteRow },
 ]
 
 /** Default bindings keyed by command id. */

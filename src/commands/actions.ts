@@ -1,8 +1,9 @@
 import type { Editor } from '@milkdown/core'
-import { useMilkdown } from '@/composables/useMilkdown'
-import { useEditorStore } from '@/stores/editor'
-import { useSettingsStore } from '@/stores/settings'
-import { useUI } from '@/composables/useUI'
+import { milkApi } from '@/composables/useMilkdown'
+import { editorStore } from '@/stores/editor'
+import { settingsStore } from '@/stores/settings'
+import { uiApi } from '@/composables/useUI'
+import { findApi } from '@/composables/useFind'
 import { readClipboardText, writeClipboardText } from '@/composables/useClipboard'
 import { requestSave as requestSaveViaBus } from '@/composables/useSaveRequest'
 import { showToast } from '@/utils/toast'
@@ -39,8 +40,8 @@ import type { Lang } from '@/types'
  */
 
 async function getMarkdown(): Promise<string> {
-  const milkdown = useMilkdown()
-  const editor = useEditorStore()
+  const milkdown = milkApi
+  const editor = editorStore.getState()
   try {
     const md = await milkdown.getMarkdown()
     return md || editor.doc.content
@@ -50,7 +51,7 @@ async function getMarkdown(): Promise<string> {
 }
 
 function withEditor(fn: (editor: Editor) => void): void {
-  const e = useMilkdown().getEditor()
+  const e = milkApi.getEditor()
   if (!e) {
     showToast('编辑器尚未就绪', 'error')
     return
@@ -89,7 +90,7 @@ export function redo(): void {
  * goes, not the whole list.
  */
 export function cut(): void {
-  const editor = useMilkdown().getEditor()
+  const editor = milkApi.getEditor()
   const sel = prose.getSelectionRange(editor)
   const wholeLine = !sel || sel.empty
   const range = wholeLine ? prose.lineRangeAt(editor) : sel
@@ -116,7 +117,7 @@ export function cut(): void {
 
 /** Copy the selection, or the caret's line when there is no selection. */
 export function copySelection(): void {
-  const editor = useMilkdown().getEditor()
+  const editor = milkApi.getEditor()
   const sel = prose.getSelectionRange(editor)
   const range = !sel || sel.empty ? prose.lineRangeAt(editor) : sel
   const text = range ? prose.getRangeText(editor, range.from, range.to) : ''
@@ -141,8 +142,14 @@ export function paste(): void {
   })()
 }
 
+/**
+ * Copy as Markdown: the **selection** when there is one (the whole document
+ * only when the caret is collapsed). The old implementation always copied the
+ * whole document, so the button ignored whatever the user had selected.
+ */
 export async function copyAsMarkdown(): Promise<void> {
-  await copyText(await getMarkdown())
+  const selected = prose.selectionMarkdown(milkApi.getEditor())
+  await copyText(selected ?? (await getMarkdown()))
 }
 
 export async function pasteAsPlainText(): Promise<void> {
@@ -196,9 +203,14 @@ export function deleteSelection(): void {
   })
 }
 
+/**
+ * Open the find bar. `find = false` opens it in **replace** mode (the replace
+ * row expanded) — that is what the Ctrl+H 替换 binding asks for. The flag used
+ * to be swallowed (`void find`), which made 查找 and 替换 behave identically.
+ */
 export function openFind(find = true): void {
-  useUI().openFind()
-  void find
+  uiApi.openFind()
+  findApi.replaceVisible.value = !find
 }
 
 /* ---------------------------- paragraph ---------------------------- */
@@ -275,7 +287,7 @@ export function tableFormat(): void {
 }
 
 export async function tableCopy(): Promise<void> {
-  const e = useMilkdown().getEditor()
+  const e = milkApi.getEditor()
   if (!e) return
   const md = tableToMarkdown(e)
   if (!md) return
@@ -291,7 +303,7 @@ export function insertCodeBlock(): void {
 
 /** Copy the plain text of the code block at the caret to the clipboard. */
 export async function copyCodeBlockContent(): Promise<void> {
-  const text = prose.getCodeBlockText(useMilkdown().getEditor())
+  const text = prose.getCodeBlockText(milkApi.getEditor())
   if (text == null) {
     showToast('光标不在代码块内', 'info')
     return
@@ -459,7 +471,7 @@ export function pickAndInsertImage(): void {
     const file = input.files?.[0]
     input.remove()
     if (!file) return
-    const e = useMilkdown().getEditor()
+    const e = milkApi.getEditor()
     if (!e) return
     try {
       const src = await getImageUploader()(file)
@@ -479,7 +491,7 @@ export function clearStyle(): void {
 
 /** Open the link under the caret in a new browser tab. */
 export async function openLink(): Promise<void> {
-  const href = prose.getLinkHref(useMilkdown().getEditor())
+  const href = prose.getLinkHref(milkApi.getEditor())
   if (!href) {
     showToast('光标不在链接上', 'info')
     return
@@ -489,7 +501,7 @@ export async function openLink(): Promise<void> {
 
 /** Copy the `href` of the link under the caret to the clipboard. */
 export async function copyLinkAddress(): Promise<void> {
-  const href = prose.getLinkHref(useMilkdown().getEditor())
+  const href = prose.getLinkHref(milkApi.getEditor())
   if (!href) {
     showToast('光标不在链接上', 'info')
     return
@@ -500,7 +512,7 @@ export async function copyLinkAddress(): Promise<void> {
 
 /** Prompt for a new URL and rewrite the link mark at the caret. */
 export async function editLink(): Promise<void> {
-  const editor = useMilkdown().getEditor()
+  const editor = milkApi.getEditor()
   if (!editor) return
   const current = prose.getLinkHref(editor) ?? 'https://'
   const next = window.prompt('编辑链接地址', current)
@@ -521,13 +533,13 @@ export function removeLink(): void {
 export function insertRemoteImage(): void {
   const url = window.prompt('输入图片 URL', 'https://')
   if (!url) return
-  const editor = useMilkdown().getEditor()
+  const editor = milkApi.getEditor()
   if (editor) insertImage(editor, url, '')
 }
 
 /** Reload all images — re-focus the editor so decorations/embeds rebuild. */
 export function reloadAllImages(): void {
-  const editor = useMilkdown().getEditor()
+  const editor = milkApi.getEditor()
   if (editor) prose.focus(editor)
   showToast('已刷新图片', 'info')
 }
@@ -535,9 +547,9 @@ export function reloadAllImages(): void {
 /* ---------------------------- view ---------------------------- */
 
 export function toggleSourceMode(): void {
-  const ui = useUI()
-  const milkdown = useMilkdown()
-  const editor = useEditorStore()
+  const ui = uiApi
+  const milkdown = milkApi
+  const editor = editorStore.getState()
   if (!ui.sourceMode.value) {
     void (async () => {
       try {
@@ -554,18 +566,18 @@ export function toggleSourceMode(): void {
 }
 
 export function setMode(mode: 'normal' | 'focus' | 'typewriter'): void {
-  const settings = useSettingsStore()
+  const settings = settingsStore.getState()
   settings.update({ mode })
   void settings.persist()
 }
 
 export function toggleFocusMode(): void {
-  const settings = useSettingsStore()
+  const settings = settingsStore.getState()
   setMode(settings.settings.mode === 'focus' ? 'normal' : 'focus')
 }
 
 export function toggleTypewriterMode(): void {
-  const settings = useSettingsStore()
+  const settings = settingsStore.getState()
   setMode(settings.settings.mode === 'typewriter' ? 'normal' : 'typewriter')
 }
 
@@ -578,14 +590,14 @@ export function toggleFullscreen(): void {
 }
 
 export function zoomActualSize(): void {
-  const settings = useSettingsStore()
+  const settings = settingsStore.getState()
   settings.update({ fontSize: 16 })
   settings.applyTypography()
   void settings.persist()
 }
 
 export function zoomIn(): void {
-  const settings = useSettingsStore()
+  const settings = settingsStore.getState()
   const next = Math.min(32, settings.settings.fontSize + 1)
   settings.update({ fontSize: next })
   settings.applyTypography()
@@ -593,7 +605,7 @@ export function zoomIn(): void {
 }
 
 export function zoomOut(): void {
-  const settings = useSettingsStore()
+  const settings = settingsStore.getState()
   const next = Math.max(12, settings.settings.fontSize - 1)
   settings.update({ fontSize: next })
   settings.applyTypography()
@@ -603,37 +615,42 @@ export function zoomOut(): void {
 /* ---------------------------- theme / lang ---------------------------- */
 
 export function applyTheme(id: string): void {
-  const settings = useSettingsStore()
+  const settings = settingsStore.getState()
   settings.applyTheme(id)
   void settings.persist()
 }
 
 export function setLanguage(lang: Lang): void {
-  const settings = useSettingsStore()
+  const settings = settingsStore.getState()
   settings.setLanguage(lang)
   void settings.persist()
 }
 
 /** Open the built-in settings dialog (rendered by MdEditor). */
 export function openPreferences(): void {
-  useUI().openSettings()
+  uiApi.openSettings()
 }
 
 /* ---------------------------- introspection for menus ---------------------------- */
 
 export function currentBlockType(): string {
-  return prose.getBlockInfo(useMilkdown().getEditor())?.type ?? 'paragraph'
+  return prose.getBlockInfo(milkApi.getEditor())?.type ?? 'paragraph'
 }
 
 export function currentHeadingLevel(): number | null {
-  const info = prose.getBlockInfo(useMilkdown().getEditor())
+  const info = prose.getBlockInfo(milkApi.getEditor())
   return info?.type === 'heading' ? (info.level ?? 1) : null
 }
 
 export function markActive(...names: string[]): boolean {
-  return prose.isMarkActive(useMilkdown().getEditor(), ...names)
+  return prose.isMarkActive(milkApi.getEditor(), ...names)
 }
 
 export function nodeActive(name: string, attrs?: Record<string, unknown>): boolean {
-  return prose.isNodeActive(useMilkdown().getEditor(), name, attrs)
+  return prose.isNodeActive(milkApi.getEditor(), name, attrs)
+}
+
+/** Whether the caret is inside a task-list item (see {@link prose.isTaskItemActive}). */
+export function taskItemActive(): boolean {
+  return prose.isTaskItemActive(milkApi.getEditor())
 }

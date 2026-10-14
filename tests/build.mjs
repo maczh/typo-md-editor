@@ -17,6 +17,10 @@ const entries = [
   'tests/outline.test.ts',
   'tests/i18n.test.ts',
   'tests/prose-line.test.ts',
+  'tests/prose-menu.test.ts',
+  'tests/prose-extended.test.ts',
+  'tests/hotkeys.test.ts',
+  'tests/mount-sequence.test.ts',
 ]
 
 const aliasPlugin = {

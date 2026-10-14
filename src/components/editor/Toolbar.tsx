@@ -105,7 +105,7 @@ export default function Toolbar() {
     scheduledRef.current = true
     requestAnimationFrame(() => {
       scheduledRef.current = false
-      setActive({
+      const next: ActiveState = {
         bold: A.markActive('strong', 'bold'),
         italic: A.markActive('emphasis', 'em', 'italic'),
         strike: A.markActive('strike_through', 'strikethrough', 'strike'),
@@ -119,10 +119,16 @@ export default function Toolbar() {
         paragraph: A.nodeActive('paragraph'),
         bullet: A.nodeActive('bullet_list'),
         ordered: A.nodeActive('ordered_list'),
-        task: A.nodeActive('task_list') || A.nodeActive('bullet_list'),
+        task: A.taskItemActive(),
         quote: A.nodeActive('blockquote'),
         codeblock: A.nodeActive('code_block') || A.nodeActive('fence'),
-      })
+      }
+      setActive(next)
+      // Keep the block-type select in sync with the caret: it used to only
+      // update on user input, so it showed a stale 段落/标题 after the cursor
+      // moved into (or out of) a heading.
+      const level = ([1, 2, 3, 4, 5, 6] as const).find((i) => next[`h${i}` as keyof ActiveState])
+      setBlockValue(level ? `h${level}` : 'paragraph')
     })
   }
 
@@ -168,33 +174,33 @@ export default function Toolbar() {
   }, [])
 
   const inlineBtns: ToolBtn[] = [
-    { key: 'bold', title: 'Ctrl+B', run: A.toggleBold, isActive: () => active.bold },
-    { key: 'italic', title: 'Ctrl+I', run: A.toggleItalic, isActive: () => active.italic },
-    { key: 'underline', title: 'Ctrl+U', run: A.toggleUnderline },
-    { key: 'strike', title: 'Alt+Shift+5', run: A.toggleStrike, isActive: () => active.strike },
+    { key: 'bold', title: hk('bold'), run: A.toggleBold, isActive: () => active.bold },
+    { key: 'italic', title: hk('italic'), run: A.toggleItalic, isActive: () => active.italic },
+    { key: 'underline', title: hk('underline'), run: A.toggleUnderline },
+    { key: 'strike', title: hk('strike'), run: A.toggleStrike, isActive: () => active.strike },
     { key: 'code', title: hk('inlineCode'), run: A.toggleInlineCode, isActive: () => active.code },
     { key: 'link', title: hk('link'), run: A.insertHyperlink },
   ]
 
   const blockBtns: ToolBtn[] = [
-    { key: 'quote', title: 'Ctrl+Shift+Q', run: A.insertBlockquote, isActive: () => active.quote },
-    { key: 'bullet', title: 'Ctrl+Shift+]', run: A.insertUnorderedList, isActive: () => active.bullet },
-    { key: 'ordered', title: 'Ctrl+Shift+[', run: A.insertOrderedList, isActive: () => active.ordered },
-    { key: 'task', title: 'Ctrl+Shift+X', run: A.insertTaskList, isActive: () => active.task },
-    { key: 'table', title: 'Ctrl+T', run: A.insertTable },
-    { key: 'codeblock', title: 'Ctrl+Shift+K', run: A.insertCodeBlock, isActive: () => active.codeblock },
-    { key: 'math', title: 'Ctrl+Shift+M', run: A.insertMathBlock },
+    { key: 'quote', title: hk('quote'), run: A.insertBlockquote, isActive: () => active.quote },
+    { key: 'bullet', title: hk('unorderedList'), run: A.insertUnorderedList, isActive: () => active.bullet },
+    { key: 'ordered', title: hk('orderedList'), run: A.insertOrderedList, isActive: () => active.ordered },
+    { key: 'task', title: hk('taskList'), run: A.insertTaskList, isActive: () => active.task },
+    { key: 'table', title: hk('insertTable'), run: A.insertTable },
+    { key: 'codeblock', title: hk('codeBlock'), run: A.insertCodeBlock, isActive: () => active.codeblock },
+    { key: 'math', title: hk('mathBlock'), run: A.insertMathBlock },
     { key: 'diagram', title: 'Mermaid', run: A.insertDiagramBlock },
-    { key: 'image', title: 'Ctrl+Shift+I', run: A.insertLocalImage },
-    { key: 'source', title: 'Ctrl+/', run: A.toggleSourceMode },
+    { key: 'image', title: hk('insertLocalImage'), run: A.insertLocalImage },
+    { key: 'source', title: hk('sourceMode'), run: A.toggleSourceMode },
   ]
 
   return (
     <div className="toolbar">
-      <button className="tb-btn" title={t('toolbar.undo')} onClick={() => A.undo()}>
+      <button className="tb-btn" title={`${t('toolbar.undo')} (${hk('undo')})`} onClick={() => A.undo()}>
         ↶
       </button>
-      <button className="tb-btn" title={t('toolbar.redo')} onClick={() => A.redo()}>
+      <button className="tb-btn" title={`${t('toolbar.redo')} (${hk('redo')})`} onClick={() => A.redo()}>
         ↷
       </button>
 
